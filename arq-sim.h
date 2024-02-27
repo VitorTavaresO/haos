@@ -20,10 +20,9 @@
 #include <my-lib/macros.h>
 #include <my-lib/matrix.h>
 #include <my-lib/bit.h>
-
+#include <ncurses/ncurses.h> // for WINDOWS
 #include "config.h"
 #include "lib.h"
-#include "../../../Softwares/MSYS2/mingw64/include/ncursesw/curses.h"
 
 namespace Arch
 {
