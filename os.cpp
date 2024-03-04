@@ -14,6 +14,37 @@ namespace OS
 {
 	Arch::Terminal *terminal;
 
+	std::string typedCharacters;
+
+	void keyboard()
+	{
+		int typed = terminal->read_typed_char();
+
+		if (terminal->is_alpha(typed) || terminal->is_num(typed))
+		{
+			typedCharacters.push_back(static_cast<char>(typed));
+			terminal->print(Arch::Terminal::Type::Command, static_cast<char>(typed));
+		}
+		else if (terminal->is_backspace(typed))
+		{
+			if (!typedCharacters.empty())
+			{
+				typedCharacters.pop_back();
+				terminal->print(Arch::Terminal::Type::Command, "\r");
+				terminal->print(Arch::Terminal::Type::Command, typedCharacters);
+			}
+		}
+		else if (terminal->is_return(typed))
+		{
+			typedCharacters.push_back('\n');
+			terminal->print(Arch::Terminal::Type::Command, "\n");
+		}
+		else
+		{
+			terminal->print(Arch::Terminal::Type::Command, " ");
+		}
+	}
+
 	// ---------------------------------------
 
 	void boot(Arch::Terminal *terminal, Arch::Cpu *cpu)
@@ -28,23 +59,9 @@ namespace OS
 
 	void interrupt(const Arch::InterruptCode interrupt)
 	{
-
-		int typed = terminal->read_typed_char();
-		if (terminal->is_alpha(typed))
+		if (interrupt == Arch::InterruptCode::Keyboard)
 		{
-			terminal->print(Arch::Terminal::Type::Kernel, static_cast<char>(typed));
-		}
-		else if (terminal->is_num(typed))
-		{
-			terminal->print(Arch::Terminal::Type::Kernel, static_cast<char>(typed));
-		}
-		else if (terminal->is_backspace(typed))
-		{
-			terminal->print(Arch::Terminal::Type::Kernel, "\r");
-		}
-		else if (terminal->is_return(typed))
-		{
-			terminal->print(Arch::Terminal::Type::Kernel, "\n");
+			keyboard();
 		}
 	}
 
