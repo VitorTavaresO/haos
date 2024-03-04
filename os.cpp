@@ -25,6 +25,7 @@ namespace OS
 			typedCharacters.push_back(static_cast<char>(typed));
 			terminal->print(Arch::Terminal::Type::Command, static_cast<char>(typed));
 		}
+
 		else if (terminal->is_backspace(typed))
 		{
 			if (!typedCharacters.empty())
@@ -34,13 +35,16 @@ namespace OS
 				terminal->print(Arch::Terminal::Type::Command, typedCharacters);
 			}
 		}
+
 		else if (terminal->is_return(typed))
 		{
 			typedCharacters.push_back('\n');
 			terminal->print(Arch::Terminal::Type::Command, "\n");
 		}
-		else
+
+		else if (typed == 32)
 		{
+			typedCharacters.push_back(' ');
 			terminal->print(Arch::Terminal::Type::Command, " ");
 		}
 	}
