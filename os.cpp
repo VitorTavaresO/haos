@@ -20,7 +20,7 @@ namespace OS
 	{
 		int typed = terminal->read_typed_char();
 
-		if (terminal->is_alpha(typed) || terminal->is_num(typed))
+		if (terminal->is_alpha(typed) || terminal->is_num(typed) || typed == ' ')
 		{
 			typedCharacters.push_back(static_cast<char>(typed));
 			terminal->print(Arch::Terminal::Type::Command, static_cast<char>(typed));
@@ -40,12 +40,6 @@ namespace OS
 		{
 			typedCharacters.push_back('\n');
 			terminal->print(Arch::Terminal::Type::Command, "\n");
-		}
-
-		else if (typed == 32)
-		{
-			typedCharacters.push_back(' ');
-			terminal->print(Arch::Terminal::Type::Command, " ");
 		}
 	}
 
