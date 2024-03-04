@@ -16,7 +16,24 @@ namespace OS
 
 	std::string typedCharacters;
 
-	void keyboard()
+	// ---------------------------------------
+
+	void verify_command()
+	{
+		if (typedCharacters == "quit")
+		{
+			typedCharacters.clear();
+			exit(0);
+		}
+
+		else
+		{
+			terminal->println(Arch::Terminal::Type::Command, "Unknown command");
+			typedCharacters.clear();
+		}
+	}
+
+	void write_command()
 	{
 		int typed = terminal->read_typed_char();
 
@@ -38,12 +55,10 @@ namespace OS
 
 		else if (terminal->is_return(typed))
 		{
-			typedCharacters.push_back('\n');
 			terminal->print(Arch::Terminal::Type::Command, "\n");
+			verify_command();
 		}
 	}
-
-	// ---------------------------------------
 
 	void boot(Arch::Terminal *terminal, Arch::Cpu *cpu)
 	{
@@ -59,7 +74,7 @@ namespace OS
 	{
 		if (interrupt == Arch::InterruptCode::Keyboard)
 		{
-			keyboard();
+			write_command();
 		}
 	}
 
