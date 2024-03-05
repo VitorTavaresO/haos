@@ -1,6 +1,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <array>
 
 #include <cstdint>
 #include <cstdlib>
@@ -13,10 +14,37 @@
 namespace OS
 {
 	Arch::Terminal *terminal;
+	Arch::Cpu *cpu;
 
 	std::string typedCharacters;
 
+	struct Process
+	{
+		uint16_t pc;
+		std::array<uint16_t, Config::nregs> registers;
+		enum class State
+		{
+			Running,
+			Ready,
+			Blocked
+		};
+		State state;
+	};
+
 	// ---------------------------------------
+
+	Process *create_process(const uint16_t pc)
+	{
+		Process *process = new Process();
+		process->pc = 1;
+		for (int i = 0; i < Config::nregs; i++)
+		{
+			process->registers[i] = 0;
+		}
+		process->state = Process::State::Ready;
+
+		return process;
+	}
 
 	void verify_command()
 	{
