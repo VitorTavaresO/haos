@@ -33,17 +33,24 @@ namespace OS
 
 	// ---------------------------------------
 
-	Process *create_process(const uint16_t pc)
+	Process *create_process(std::string_view fname)
 	{
-		Process *process = new Process();
-		process->pc = 1;
-		for (int i = 0; i < Config::nregs; i++)
+		if (Lib::get_file_size_words(fname) <= Config::memsize_words)
 		{
-			process->registers[i] = 0;
-		}
-		process->state = Process::State::Ready;
+			std::vector<uint16_t> bin = Lib::load_from_disk_to_16bit_buffer(fname);
 
-		return process;
+			Process *process = new Process();
+			process->pc = 1;
+
+			for (int i = 0; i < Config::nregs; i++)
+			{
+				process->registers[i] = 0;
+			}
+
+			process->state = Process::State::Ready;
+
+			return process;
+		}
 	}
 
 	void verify_command()
