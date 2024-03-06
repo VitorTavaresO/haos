@@ -49,6 +49,11 @@ namespace OS
 
 			process->state = Process::State::Ready;
 
+			for (int i = 0; i < bin.size(); i++)
+			{
+				cpu->pmem_write(i, bin[i]);
+			}
+
 			return process;
 		}
 	}
