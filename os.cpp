@@ -18,8 +18,6 @@ namespace OS
 
 	std::string typedCharacters;
 
-	Process current_process;
-
 	// ---------------------------------------
 
 	struct Process
@@ -35,6 +33,8 @@ namespace OS
 		State state;
 	};
 
+	Process *current_process_ptr = nullptr;
+
 	// ---------------------------------------
 
 	Process *create_process(std::string_view fname)
@@ -46,19 +46,29 @@ namespace OS
 			Process *process = new Process();
 			process->pc = 1;
 
-			for (int i = 0; i < Config::nregs; i++)
+			for (uint32_t i = 0; i < Config::nregs; i++)
 			{
 				process->registers[i] = 0;
 			}
 
 			process->state = Process::State::Ready;
 
-			for (int i = 0; i < bin.size(); i++)
+			for (uint32_t i = 0; i < bin.size(); i++)
 			{
 				cpu->pmem_write(i, bin[i]);
 			}
 
 			return process;
+		}
+		return nullptr;
+	}
+
+	void schedule_process(Process *current_process_ptr)
+	{
+		cpu->set_pc(current_process_ptr->pc);
+		for (uint32_t i = 0; i < Config::nregs; i++)
+		{
+			cpu->set_gpr(i, current_process_ptr->registers[i]);
 		}
 	}
 
@@ -67,7 +77,7 @@ namespace OS
 		if (typedCharacters == "quit")
 		{
 			typedCharacters.clear();
-			exit(0);
+			cpu->turn_off();
 		}
 
 		else
@@ -107,10 +117,12 @@ namespace OS
 	void boot(Arch::Terminal *terminal, Arch::Cpu *cpu)
 	{
 		OS::terminal = terminal;
+		OS::cpu = cpu;
 		terminal->println(Arch::Terminal::Type::Command, "Type commands here");
 		terminal->println(Arch::Terminal::Type::App, "Apps output here");
 		terminal->println(Arch::Terminal::Type::Kernel, "Kernel output here");
-		current_process = create_process("print.bin");
+		current_process_ptr = create_process("print.bin");
+		schedule_process(current_process_ptr);
 	}
 
 	// ---------------------------------------
@@ -127,6 +139,29 @@ namespace OS
 
 	void syscall()
 	{
+		switch (cpu->get_gpr(0))
+		{
+		case 0:
+			cpu->turn_off();
+			break;
+		case 1:
+		{
+			uint16_t addr = cpu->get_gpr(1);
+			while (cpu->pmem_read(addr) != 0)
+			{
+
+				terminal->print(Arch::Terminal::Type::App, static_cast<char>(cpu->pmem_read(addr)));
+				addr++;
+			}
+			break;
+		}
+		case 2:
+			terminal->println(Arch::Terminal::Type::App, "\n");
+			break;
+		case 3:
+			terminal->println(Arch::Terminal::Type::App, cpu->get_gpr(1));
+			break;
+		}
 	}
 
 	// ---------------------------------------
