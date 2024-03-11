@@ -5,7 +5,7 @@ MYLIB = ../my-lib
 CC = gcc
 CPP = g++
 LD = g++
-FLAGS = -std=c++23
+FLAGS = -std=c++23 -ggdb
 
 ifdef CONFIG_TARGET_WINDOWS
 	FLAGS += -DNCURSES_STATIC=1 -DCONFIG_TARGET_WINDOWS=1
