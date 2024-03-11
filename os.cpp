@@ -18,6 +18,10 @@ namespace OS
 
 	std::string typedCharacters;
 
+	Process current_process;
+
+	// ---------------------------------------
+
 	struct Process
 	{
 		uint16_t pc;
@@ -106,6 +110,7 @@ namespace OS
 		terminal->println(Arch::Terminal::Type::Command, "Type commands here");
 		terminal->println(Arch::Terminal::Type::App, "Apps output here");
 		terminal->println(Arch::Terminal::Type::Kernel, "Kernel output here");
+		current_process = create_process("print.bin");
 	}
 
 	// ---------------------------------------
