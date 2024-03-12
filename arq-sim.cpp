@@ -486,10 +486,10 @@ namespace Arch
 		terminal = new Terminal;
 #endif
 
-		terminal_println(Arch, "teste arch 123456789123456789123456789123456789123456789123456789");
-		terminal_println(Kernel, "teste kernel");
-		terminal_println(Command, "teste command");
-		terminal_println(App, "teste app");
+		// terminal_println(Arch, "teste arch 123456789123456789123456789123456789123456789123456789");
+		//  terminal_println(Kernel, "teste kernel");
+		//  terminal_println(Command, "teste command");
+		//  terminal_println(App, "teste app");
 
 		cpu = new Cpu;
 	}
