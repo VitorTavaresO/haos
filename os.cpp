@@ -80,6 +80,14 @@ namespace OS
 			cpu->turn_off();
 		}
 
+		else if (typedCharacters.find("run ") == 0)
+		{
+			std::string_view filename = typedCharacters.substr(4);
+			current_process_ptr = create_process(filename);
+			schedule_process(current_process_ptr);
+			typedCharacters.clear();
+		}
+
 		else
 		{
 			terminal->println(Arch::Terminal::Type::Command, "Unknown command");
@@ -91,7 +99,7 @@ namespace OS
 	{
 		int typed = terminal->read_typed_char();
 
-		if (terminal->is_alpha(typed) || terminal->is_num(typed) || typed == ' ')
+		if (terminal->is_alpha(typed) || terminal->is_num(typed) || typed == ' ' || typed == '.' || typed == '/')
 		{
 			typedCharacters.push_back(static_cast<char>(typed));
 			terminal->print(Arch::Terminal::Type::Command, static_cast<char>(typed));
@@ -121,8 +129,6 @@ namespace OS
 		terminal->println(Arch::Terminal::Type::Command, "Type commands here");
 		terminal->println(Arch::Terminal::Type::App, "Apps output here");
 		terminal->println(Arch::Terminal::Type::Kernel, "Kernel output here");
-		current_process_ptr = create_process("print.bin");
-		schedule_process(current_process_ptr);
 	}
 
 	// ---------------------------------------
