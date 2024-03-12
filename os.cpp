@@ -83,9 +83,10 @@ namespace OS
 		else if (typedCharacters.find("run -file ") == 0)
 		{
 			std::string_view filename = typedCharacters.substr(10);
+			typedCharacters.clear();
+			terminal->println(Arch::Terminal::Type::Command, "Running file:" + std::string(filename) + "\n");
 			current_process_ptr = create_process(filename);
 			schedule_process(current_process_ptr);
-			typedCharacters.clear();
 		}
 
 		else
