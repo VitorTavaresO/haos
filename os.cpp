@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <filesystem>
 
 #include "config.h"
 #include "lib.h"
@@ -84,9 +85,16 @@ namespace OS
 		{
 			std::string_view filename = typedCharacters.substr(10);
 			typedCharacters.clear();
-			terminal->println(Arch::Terminal::Type::Command, "Running file:" + std::string(filename) + "\n");
-			current_process_ptr = create_process(filename);
-			schedule_process(current_process_ptr);
+			if (std::filesystem::exists(filename))
+			{
+				terminal->println(Arch::Terminal::Type::Command, "Running file:" + std::string(filename) + "\n");
+				current_process_ptr = create_process(filename);
+				schedule_process(current_process_ptr);
+			}
+			else
+			{
+				terminal->println(Arch::Terminal::Type::Command, "File not found\n");
+			}
 		}
 
 		else
