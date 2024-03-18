@@ -81,19 +81,29 @@ namespace OS
 			cpu->turn_off();
 		}
 
-		else if (typedCharacters.find("run -file ") == 0)
+		else if (typedCharacters.find("run ") == 0)
 		{
-			std::string_view filename = typedCharacters.substr(10);
-			typedCharacters.clear();
-			if (std::filesystem::exists(filename))
+			typedCharacters = typedCharacters.substr(4);
+
+			if (typedCharacters.find("-file ") == 0)
 			{
-				terminal->println(Arch::Terminal::Type::Command, "Running file:" + std::string(filename) + "\n");
-				current_process_ptr = create_process(filename);
-				schedule_process(current_process_ptr);
+				std::string_view filename = typedCharacters.substr(6);
+				typedCharacters.clear();
+				if (std::filesystem::exists(filename))
+				{
+					terminal->println(Arch::Terminal::Type::Command, "Running file:" + std::string(filename) + "\n");
+					current_process_ptr = create_process(filename);
+					schedule_process(current_process_ptr);
+				}
+				else
+				{
+					terminal->println(Arch::Terminal::Type::Command, "File not found\n");
+				}
 			}
 			else
 			{
-				terminal->println(Arch::Terminal::Type::Command, "File not found\n");
+				terminal->println(Arch::Terminal::Type::Command, "Unknown command");
+				typedCharacters.clear();
 			}
 		}
 
