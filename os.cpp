@@ -106,6 +106,20 @@ namespace OS
 				typedCharacters.clear();
 			}
 		}
+		else if (typedCharacters == "kill")
+		{
+			typedCharacters.clear();
+			if (current_process_ptr != nullptr)
+			{
+				delete current_process_ptr;
+				current_process_ptr = nullptr;
+				terminal->println(Arch::Terminal::Type::Command, "Current process killed\n");
+			}
+			else
+			{
+				terminal->println(Arch::Terminal::Type::Command, "No process to kill\n");
+			}
+		}
 
 		else
 		{
