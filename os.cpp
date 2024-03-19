@@ -50,7 +50,6 @@ namespace OS
 
 			Process *process = new Process();
 			process->pc = 1;
-			process->limitr = Lib::get_file_size_words(fname) - 1;
 
 			if (count == 0)
 			{
@@ -62,6 +61,8 @@ namespace OS
 				process->baser = idle_process_ptr->limitr + 1;
 			}
 
+			process->limitr = (process->baser + (Lib::get_file_size_words(fname))) - 1;
+
 			for (uint32_t i = 0; i < Config::nregs; i++)
 			{
 				process->registers[i] = 0;
@@ -69,7 +70,7 @@ namespace OS
 
 			process->state = Process::State::Ready;
 
-			for (uint32_t i = 0; i < bin.size(); i++)
+			for (uint32_t i = process->baser; i < bin.size(); i++)
 			{
 				cpu->pmem_write(i, bin[i]);
 			}
@@ -79,12 +80,15 @@ namespace OS
 		return nullptr;
 	}
 
-	void schedule_process(Process *current_process_ptr)
+	void schedule_process(Process *process)
 	{
-		cpu->set_pc(current_process_ptr->pc);
+		cpu->set_pc(process->pc);
+		cpu->set_vmem_paddr_init(process->baser);
+		cpu->set_vmem_paddr_end(process->limitr);
+
 		for (uint32_t i = 0; i < Config::nregs; i++)
 		{
-			cpu->set_gpr(i, current_process_ptr->registers[i]);
+			cpu->set_gpr(i, process->registers[i]);
 		}
 	}
 
