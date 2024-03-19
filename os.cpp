@@ -32,9 +32,12 @@ namespace OS
 			Blocked
 		};
 		State state;
+		uint16_t baser;
+		uint16_t limitr;
 	};
 
 	Process *current_process_ptr = nullptr;
+	Process *idle_process_ptr = nullptr;
 
 	// ---------------------------------------
 
@@ -42,10 +45,22 @@ namespace OS
 	{
 		if (Lib::get_file_size_words(fname) <= Config::memsize_words)
 		{
+			static uint16_t count = 0;
 			std::vector<uint16_t> bin = Lib::load_from_disk_to_16bit_buffer(fname);
 
 			Process *process = new Process();
 			process->pc = 1;
+			process->limitr = Lib::get_file_size_words(fname) - 1;
+
+			if (count == 0)
+			{
+				process->baser = 0;
+				count = 1;
+			}
+			else
+			{
+				process->baser = idle_process_ptr->limitr + 1;
+			}
 
 			for (uint32_t i = 0; i < Config::nregs; i++)
 			{
@@ -106,21 +121,6 @@ namespace OS
 				typedCharacters.clear();
 			}
 		}
-		else if (typedCharacters == "kill")
-		{
-			typedCharacters.clear();
-			if (current_process_ptr != nullptr)
-			{
-				delete current_process_ptr;
-				current_process_ptr = nullptr;
-				terminal->println(Arch::Terminal::Type::Command, "Current process killed\n");
-			}
-			else
-			{
-				terminal->println(Arch::Terminal::Type::Command, "No process to kill\n");
-			}
-		}
-
 		else
 		{
 			terminal->println(Arch::Terminal::Type::Command, "Unknown command");
@@ -162,6 +162,8 @@ namespace OS
 		terminal->println(Arch::Terminal::Type::Command, "Type commands here");
 		terminal->println(Arch::Terminal::Type::App, "Apps output here");
 		terminal->println(Arch::Terminal::Type::Kernel, "Kernel output here");
+		idle_process_ptr = create_process("bin/idle.bin");
+		schedule_process(idle_process_ptr);
 	}
 
 	// ---------------------------------------
