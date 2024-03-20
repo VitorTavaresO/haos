@@ -82,6 +82,7 @@ namespace OS
 
 	void schedule_process(Process *process)
 	{
+		current_process_ptr = process;
 		cpu->set_pc(process->pc);
 		cpu->set_vmem_paddr_init(process->baser);
 		cpu->set_vmem_paddr_end(process->limitr);
