@@ -1,5 +1,3 @@
 *.exe
 .vscode
-arq-sim.o
-lib.o
-os.o
+*.o
