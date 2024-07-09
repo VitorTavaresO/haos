@@ -227,6 +227,12 @@ namespace OS
 	{
 		if (interrupt == Arch::InterruptCode::Keyboard)
 			write_command();
+
+		else if (interrupt == Arch::InterruptCode::GPF)
+		{
+			terminal->println(Arch::Terminal::Type::Kernel, "General Protection Fault\n");
+			kill();
+		}
 	}
 
 	void syscall()
