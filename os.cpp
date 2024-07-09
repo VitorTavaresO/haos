@@ -60,13 +60,10 @@ namespace OS
 			process->pc = 1;
 
 			if (idle_process_ptr == nullptr)
-			{
 				process->baser = 0;
-			}
+
 			else
-			{
 				process->baser = idle_process_ptr->limitr + 1;
-			}
 
 			process->limitr = (process->baser + size) - 1;
 
@@ -231,9 +228,7 @@ namespace OS
 	void interrupt(const Arch::InterruptCode interrupt)
 	{
 		if (interrupt == Arch::InterruptCode::Keyboard)
-		{
 			write_command();
-		}
 	}
 
 	void syscall()
@@ -247,7 +242,7 @@ namespace OS
 		{
 			uint16_t addr = cpu->get_gpr(1);
 
-			addr = current_process_ptr->baser + addr;
+			addr = addr + current_process_ptr->baser;
 
 			while (cpu->pmem_read(addr) != 0)
 			{
@@ -266,4 +261,4 @@ namespace OS
 		}
 	}
 
-} // end namespace OS
+}
