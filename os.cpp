@@ -72,8 +72,8 @@ namespace OS
 
 			process->state = Process::State::Ready;
 
-			for (uint32_t i = process->baser; i < bin.size(); i++)
-				cpu->pmem_write(i, bin[i]);
+			for (uint32_t i = 0; i < bin.size(); i++)
+				cpu->pmem_write(i + process->baser, bin[i]);
 
 			return process;
 		}
@@ -223,8 +223,6 @@ namespace OS
 		schedule_process(idle_process_ptr);
 	}
 
-	// ---------------------------------------
-
 	void interrupt(const Arch::InterruptCode interrupt)
 	{
 		if (interrupt == Arch::InterruptCode::Keyboard)
@@ -236,7 +234,7 @@ namespace OS
 		switch (cpu->get_gpr(0))
 		{
 		case 0:
-			cpu->turn_off();
+			kill();
 			break;
 		case 1:
 		{
