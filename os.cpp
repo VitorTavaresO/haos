@@ -19,8 +19,6 @@ namespace OS
 
 	std::string typedCharacters;
 
-	// ---------------------------------------
-
 	struct Process
 	{
 		std::string name;
@@ -38,9 +36,8 @@ namespace OS
 	};
 
 	Process *current_process_ptr = nullptr;
+	Process *ready_process_ptr = nullptr;
 	Process *idle_process_ptr = nullptr;
-
-	// ---------------------------------------
 
 	void panic(const std::string_view msg)
 	{
@@ -72,6 +69,9 @@ namespace OS
 
 			process->state = Process::State::Ready;
 
+			if (fname != "bin/idle.bin")
+				ready_process_ptr = process;
+
 			for (uint32_t i = 0; i < bin.size(); i++)
 				cpu->pmem_write(i + process->baser, bin[i]);
 
@@ -91,6 +91,7 @@ namespace OS
 		for (uint32_t i = 0; i < Config::nregs; i++)
 			process->registers[i] = cpu->get_gpr(i);
 		process->pc = cpu->get_pc();
+
 		current_process_ptr = nullptr;
 
 		terminal->println(Arch::Terminal::Type::Kernel, "Unschedule process: " + process->name + "\n");
@@ -116,15 +117,13 @@ namespace OS
 
 	void kill()
 	{
-		Process *process = current_process_ptr;
+		Process *process = ready_process_ptr;
 
-		if (current_process_ptr != idle_process_ptr)
+		if (ready_process_ptr != idle_process_ptr)
 		{
-			unschedule_process();
 			for (uint32_t i = process->baser; i <= process->limitr; i++)
 				cpu->pmem_write(i, 0);
 
-			schedule_process(idle_process_ptr);
 			terminal->println(Arch::Terminal::Type::Command, "Process " + process->name + " killed\n");
 			terminal->println(Arch::Terminal::Type::Kernel, "Process " + process->name + " killed\n");
 			delete process;
@@ -175,7 +174,16 @@ namespace OS
 		}
 		else if (typedCharacters == "kill")
 		{
-			kill();
+			if (current_process_ptr != idle_process_ptr)
+			{
+				unschedule_process();
+				kill();
+				schedule_process(idle_process_ptr);
+			}
+			else
+			{
+				terminal->println(Arch::Terminal::Type::Command, "No process to kill");
+			}
 			typedCharacters.clear();
 		}
 		else
@@ -231,7 +239,9 @@ namespace OS
 		else if (interrupt == Arch::InterruptCode::GPF)
 		{
 			terminal->println(Arch::Terminal::Type::Kernel, "General Protection Fault\n");
+			unschedule_process();
 			kill();
+			schedule_process(idle_process_ptr);
 		}
 	}
 
@@ -240,7 +250,9 @@ namespace OS
 		switch (cpu->get_gpr(0))
 		{
 		case 0:
+			unschedule_process();
 			kill();
+			schedule_process(idle_process_ptr);
 			break;
 		case 1:
 		{
