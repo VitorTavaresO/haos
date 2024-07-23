@@ -36,8 +36,9 @@ namespace OS
 	};
 
 	Process *current_process_ptr = nullptr;
-	Process *ready_process_ptr = nullptr;
 	Process *idle_process_ptr = nullptr;
+
+	std::vector<Process *> ready_processes;
 
 	void panic(const std::string_view msg)
 	{
@@ -53,7 +54,6 @@ namespace OS
 			std::vector<uint16_t> bin = Lib::load_from_disk_to_16bit_buffer(fname);
 
 			Process *process = new Process();
-			process->name = std::string(fname);
 			process->pc = 1;
 
 			if (idle_process_ptr == nullptr)
@@ -70,10 +70,14 @@ namespace OS
 			process->state = Process::State::Ready;
 
 			if (fname != "bin/idle.bin")
-				ready_process_ptr = process;
+				ready_processes.push_back(process);
 
 			for (uint32_t i = 0; i < bin.size(); i++)
 				cpu->pmem_write(i + process->baser, bin[i]);
+
+			process->name = fname.substr(4);
+
+			terminal->println(Arch::Terminal::Type::Kernel, "Process " + process->name + " created\n");
 
 			return process;
 		}
@@ -90,9 +94,12 @@ namespace OS
 		process->state = Process::State::Ready;
 		for (uint32_t i = 0; i < Config::nregs; i++)
 			process->registers[i] = cpu->get_gpr(i);
+
 		process->pc = cpu->get_pc();
 
 		current_process_ptr = nullptr;
+
+		ready_processes.push_back(process);
 
 		terminal->println(Arch::Terminal::Type::Kernel, "Unschedule process: " + process->name + "\n");
 	}
@@ -115,23 +122,24 @@ namespace OS
 			cpu->set_gpr(i, process->registers[i]);
 	}
 
-	void kill()
+	void kill(const std::string_view fname)
 	{
-		Process *process = ready_process_ptr;
-
-		if (ready_process_ptr != idle_process_ptr)
+		for (auto it = ready_processes.begin(); it != ready_processes.end(); it++)
 		{
-			for (uint32_t i = process->baser; i <= process->limitr; i++)
-				cpu->pmem_write(i, 0);
+			if ((*it)->name == fname)
+			{
+				Process *process = *it;
+				for (uint32_t i = process->baser; i <= process->limitr; i++)
+					cpu->pmem_write(i, 0);
 
-			terminal->println(Arch::Terminal::Type::Command, "Process " + process->name + " killed\n");
-			terminal->println(Arch::Terminal::Type::Kernel, "Process " + process->name + " killed\n");
-			delete process;
+				terminal->println(Arch::Terminal::Type::Command, "Process " + process->name + " killed\n");
+				terminal->println(Arch::Terminal::Type::Kernel, "Process " + process->name + " killed\n");
+				ready_processes.erase(it);
+				delete process;
+				break;
+			}
 		}
-		else
-		{
-			terminal->println(Arch::Terminal::Type::Command, "No process to kill");
-		}
+		terminal->println(Arch::Terminal::Type::Command, "No process to kill");
 	}
 
 	void verify_command()
@@ -144,47 +152,40 @@ namespace OS
 
 		else if (typedCharacters.find("run ") == 0)
 		{
-			typedCharacters = typedCharacters.substr(4);
-
-			if (typedCharacters.find("-file ") == 0)
+			typedCharacters.erase(0, 4);
+			std::string filename = typedCharacters;
+			typedCharacters.clear();
+			if (std::filesystem::exists(filename))
 			{
-				std::string_view filename = typedCharacters.substr(6);
-				typedCharacters.clear();
-				if (std::filesystem::exists(filename))
-				{
-					terminal->println(Arch::Terminal::Type::Command, "Running file:" + std::string(filename) + "\n");
-					if (current_process_ptr != idle_process_ptr)
-						terminal->println(Arch::Terminal::Type::Command, "File Running - Please Kill " + current_process_ptr->name + " Before Running Another File\n");
-					else
-					{
-						unschedule_process();
-						schedule_process(create_process(filename));
-					}
-				}
+				terminal->println(Arch::Terminal::Type::Command, "Running file:" + filename + "\n");
+				if (current_process_ptr != idle_process_ptr)
+					terminal->println(Arch::Terminal::Type::Command, "File Running - Please Kill " + current_process_ptr->name + " Before Running Another File\n");
 				else
 				{
-					terminal->println(Arch::Terminal::Type::Command, "File not found\n");
+					unschedule_process();
+					schedule_process(create_process(filename));
 				}
 			}
 			else
 			{
-				terminal->println(Arch::Terminal::Type::Command, "Unknown command");
-				typedCharacters.clear();
+				terminal->println(Arch::Terminal::Type::Command, "File " + filename + " not found\n");
 			}
 		}
-		else if (typedCharacters == "kill")
+		else if (typedCharacters.find("kill ") == 0)
 		{
+			typedCharacters.erase(0, 5);
+			std::string filename = typedCharacters;
+			typedCharacters.clear();
 			if (current_process_ptr != idle_process_ptr)
 			{
 				unschedule_process();
-				kill();
+				kill(filename);
 				schedule_process(idle_process_ptr);
 			}
 			else
 			{
 				terminal->println(Arch::Terminal::Type::Command, "No process to kill");
 			}
-			typedCharacters.clear();
 		}
 		else
 		{
@@ -240,7 +241,7 @@ namespace OS
 		{
 			terminal->println(Arch::Terminal::Type::Kernel, "General Protection Fault\n");
 			unschedule_process();
-			kill();
+			kill(current_process_ptr->name);
 			schedule_process(idle_process_ptr);
 		}
 	}
@@ -251,7 +252,7 @@ namespace OS
 		{
 		case 0:
 			unschedule_process();
-			kill();
+			kill(current_process_ptr->name);
 			schedule_process(idle_process_ptr);
 			break;
 		case 1:
