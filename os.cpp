@@ -139,7 +139,7 @@ namespace OS
 				break;
 			}
 		}
-		terminal->println(Arch::Terminal::Type::Command, "No process to kill");
+		terminal->println(Arch::Terminal::Type::Command, "No process to kill with this name\n");
 	}
 
 	void verify_command()
@@ -240,19 +240,21 @@ namespace OS
 		else if (interrupt == Arch::InterruptCode::GPF)
 		{
 			terminal->println(Arch::Terminal::Type::Kernel, "General Protection Fault\n");
+			std::string_view fname = current_process_ptr->name;
 			unschedule_process();
-			kill(current_process_ptr->name);
+			kill(fname);
 			schedule_process(idle_process_ptr);
 		}
 	}
 
 	void syscall()
 	{
+		std::string_view fname = current_process_ptr->name;
 		switch (cpu->get_gpr(0))
 		{
 		case 0:
 			unschedule_process();
-			kill(current_process_ptr->name);
+			kill(fname);
 			schedule_process(idle_process_ptr);
 			break;
 		case 1:
