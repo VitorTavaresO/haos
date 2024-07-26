@@ -257,19 +257,24 @@ namespace OS
 		else if (interrupt == Arch::InterruptCode::GPF)
 		{
 			terminal->println(Arch::Terminal::Type::Kernel, "General Protection Fault\n");
-			unschedule_process();
-			kill(current_process_ptr);
-			schedule_process(idle_process_ptr);
+			if (current_process_ptr != idle_process_ptr)
+			{
+				Process *process_to_kill = current_process_ptr;
+				unschedule_process();
+				kill(process_to_kill);
+				schedule_process(idle_process_ptr);
+			}
 		}
 	}
 
 	void syscall()
 	{
+		Process *process_to_kill = current_process_ptr;
 		switch (cpu->get_gpr(0))
 		{
 		case 0:
 			unschedule_process();
-			kill(current_process_ptr);
+			kill(process_to_kill);
 			schedule_process(idle_process_ptr);
 			break;
 		case 1:
