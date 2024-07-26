@@ -122,24 +122,26 @@ namespace OS
 			cpu->set_gpr(i, process->registers[i]);
 	}
 
-	void kill(const std::string_view fname)
+	Process *search_process(const std::string_view fname)
 	{
 		for (auto it = ready_processes.begin(); it != ready_processes.end(); it++)
 		{
-			if ((*it)->name == fname)
-			{
-				Process *process = *it;
-				for (uint32_t i = process->baser; i <= process->limitr; i++)
-					cpu->pmem_write(i, 0);
-
-				terminal->println(Arch::Terminal::Type::Command, "Process " + process->name + " killed\n");
-				terminal->println(Arch::Terminal::Type::Kernel, "Process " + process->name + " killed\n");
-				ready_processes.erase(it);
-				delete process;
-				break;
-			}
+			Process *process = *it;
+			if (process->name == fname)
+				return process;
 		}
-		terminal->println(Arch::Terminal::Type::Command, "No process to kill with this name\n");
+		return nullptr;
+	}
+
+	void kill(Process *process)
+	{
+		for (uint32_t i = process->baser; i <= process->limitr; i++)
+			cpu->pmem_write(i, 0);
+
+		terminal->println(Arch::Terminal::Type::Command, "Process " + process->name + " killed\n");
+		terminal->println(Arch::Terminal::Type::Kernel, "Process " + process->name + " killed\n");
+		ready_processes.erase(std::remove(ready_processes.begin(), ready_processes.end(), process), ready_processes.end());
+		delete process;
 	}
 
 	void verify_command()
@@ -178,9 +180,17 @@ namespace OS
 			typedCharacters.clear();
 			if (current_process_ptr != idle_process_ptr)
 			{
-				unschedule_process();
-				kill(filename);
-				schedule_process(idle_process_ptr);
+				Process *process = search_process(filename);
+				if (process != nullptr)
+				{
+					unschedule_process();
+					kill(process);
+					schedule_process(idle_process_ptr);
+				}
+				else
+				{
+					terminal->println(Arch::Terminal::Type::Command, "No process with this name to kill\n");
+				}
 			}
 			else
 			{
@@ -240,21 +250,19 @@ namespace OS
 		else if (interrupt == Arch::InterruptCode::GPF)
 		{
 			terminal->println(Arch::Terminal::Type::Kernel, "General Protection Fault\n");
-			std::string_view fname = current_process_ptr->name;
 			unschedule_process();
-			kill(fname);
+			kill(current_process_ptr);
 			schedule_process(idle_process_ptr);
 		}
 	}
 
 	void syscall()
 	{
-		std::string_view fname = current_process_ptr->name;
 		switch (cpu->get_gpr(0))
 		{
 		case 0:
 			unschedule_process();
-			kill(fname);
+			kill(current_process_ptr);
 			schedule_process(idle_process_ptr);
 			break;
 		case 1:
