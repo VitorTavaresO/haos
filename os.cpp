@@ -183,9 +183,16 @@ namespace OS
 				Process *process = search_process(filename);
 				if (process != nullptr)
 				{
-					unschedule_process();
-					kill(process);
-					schedule_process(idle_process_ptr);
+					if (process == current_process_ptr)
+					{
+						unschedule_process();
+						kill(process);
+						schedule_process(idle_process_ptr);
+					}
+					else
+					{
+						kill(process);
+					}
 				}
 				else
 				{
