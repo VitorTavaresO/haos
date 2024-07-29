@@ -2,6 +2,7 @@
 #include <string>
 #include <string_view>
 #include <array>
+#include <list>
 
 #include <cstdint>
 #include <cstdlib>
@@ -38,7 +39,8 @@ namespace OS
 	Process *current_process_ptr = nullptr;
 	Process *idle_process_ptr = nullptr;
 
-	std::vector<Process *> ready_processes;
+	std::list<Process *> ready_processes;
+	std::list<Process *>::iterator ready_processes_begin = ready_processes.begin();
 
 	void panic(const std::string_view msg)
 	{
@@ -59,8 +61,15 @@ namespace OS
 			if (idle_process_ptr == nullptr)
 				process->baser = 0;
 
-			else
+			else if (ready_processes.empty())
 				process->baser = idle_process_ptr->limitr + 1;
+
+			else
+			{
+
+				Process *last_process = ready_processes.back();
+				process->baser = last_process->limitr + 1;
+			}
 
 			process->limitr = (process->baser + size) - 1;
 
@@ -69,11 +78,14 @@ namespace OS
 
 			process->state = Process::State::Ready;
 
-			if (fname != "bin/idle.bin")
-				ready_processes.push_back(process);
-
 			for (uint32_t i = 0; i < bin.size(); i++)
 				cpu->pmem_write(i + process->baser, bin[i]);
+
+			if (process != idle_process_ptr)
+			{
+				ready_processes.push_back(process);
+				ready_processes_begin = ready_processes.begin();
+			}
 
 			process->name = fname.substr(4);
 
@@ -98,8 +110,6 @@ namespace OS
 		process->pc = cpu->get_pc();
 
 		current_process_ptr = nullptr;
-
-		ready_processes.push_back(process);
 
 		terminal->println(Arch::Terminal::Type::Kernel, "Unschedule process: " + process->name + "\n");
 	}
@@ -133,6 +143,26 @@ namespace OS
 		return nullptr;
 	}
 
+	void round_robin()
+	{
+		if (current_process_ptr == idle_process_ptr)
+			return;
+
+		if (ready_processes.empty())
+			return;
+
+		ready_processes_begin++;
+		if (ready_processes_begin == ready_processes.end())
+		{
+			ready_processes_begin = ready_processes.begin();
+		}
+
+		Process *process = *ready_processes_begin;
+
+		unschedule_process();
+		schedule_process(process);
+	}
+
 	void kill(Process *process)
 	{
 		for (uint32_t i = process->baser; i <= process->limitr; i++)
@@ -160,13 +190,8 @@ namespace OS
 			if (std::filesystem::exists(filename))
 			{
 				terminal->println(Arch::Terminal::Type::Command, "Running file:" + filename + "\n");
-				if (current_process_ptr != idle_process_ptr)
-					terminal->println(Arch::Terminal::Type::Command, "File Running - Please Kill " + current_process_ptr->name + " Before Running Another File\n");
-				else
-				{
-					unschedule_process();
-					schedule_process(create_process(filename));
-				}
+				unschedule_process();
+				schedule_process(create_process(filename));
 			}
 			else
 			{
@@ -254,6 +279,10 @@ namespace OS
 		if (interrupt == Arch::InterruptCode::Keyboard)
 			write_command();
 
+		if (interrupt == Arch::InterruptCode::Timer)
+		{
+			round_robin();
+		}
 		else if (interrupt == Arch::InterruptCode::GPF)
 		{
 			terminal->println(Arch::Terminal::Type::Kernel, "General Protection Fault\n");
@@ -269,13 +298,13 @@ namespace OS
 
 	void syscall()
 	{
+
 		Process *process_to_kill = current_process_ptr;
 		switch (cpu->get_gpr(0))
 		{
 		case 0:
-			unschedule_process();
+			round_robin();
 			kill(process_to_kill);
-			schedule_process(idle_process_ptr);
 			break;
 		case 1:
 		{
@@ -299,5 +328,4 @@ namespace OS
 			break;
 		}
 	}
-
 }
