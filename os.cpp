@@ -36,16 +36,51 @@ namespace OS
 		uint16_t limitr;
 	};
 
+	struct MemoryInterval
+	{
+		uint16_t start;
+		uint16_t end;
+	};
+
 	Process *current_process_ptr = nullptr;
 	Process *idle_process_ptr = nullptr;
 
 	std::list<Process *> ready_processes;
 	std::list<Process *>::iterator ready_processes_begin = ready_processes.begin();
 
+	std::list<MemoryInterval> free_memory_intervals = {{0, Config::memsize_words - 1}};
+
 	void panic(const std::string_view msg)
 	{
 		terminal->println(Arch::Terminal::Type::Kernel, "Kernel Panic: " + std::string(msg));
 		cpu->turn_off();
+	}
+
+	MemoryInterval *find_free_memory_interval(const uint32_t size)
+	{
+		for (auto &interval : free_memory_intervals)
+		{
+			if ((interval.end - interval.start + 1) >= size)
+			{
+				return &interval;
+			}
+		}
+		return nullptr;
+	}
+
+	MemoryInterval allocate_memory(const uint32_t size)
+	{
+		MemoryInterval *interval = find_free_memory_interval(size);
+		if (interval == nullptr)
+			return {1, 0};
+
+		MemoryInterval new_memory = {interval->start, interval->start + size - 1};
+		interval->start += size;
+
+		if (interval->start > interval->end)
+			free_memory_intervals.erase(std::remove(free_memory_intervals.begin(), free_memory_intervals.end(), *interval), free_memory_intervals.end());
+
+		return new_memory;
 	}
 
 	Process *create_process(const std::string_view fname)
@@ -56,6 +91,9 @@ namespace OS
 			std::vector<uint16_t> bin = Lib::load_from_disk_to_16bit_buffer(fname);
 
 			Process *process = new Process();
+
+			MemoryInterval memory = allocate_memory(bin.size());
+
 			process->pc = 1;
 
 			if (idle_process_ptr == nullptr)
