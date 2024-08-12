@@ -20,6 +20,12 @@ namespace OS
 
 	std::string typedCharacters;
 
+	struct MemoryInterval
+	{
+		uint16_t start;
+		uint16_t end;
+	};
+
 	struct Process
 	{
 		std::string name;
@@ -36,12 +42,6 @@ namespace OS
 		uint16_t limitr;
 	};
 
-	struct MemoryInterval
-	{
-		uint16_t start;
-		uint16_t end;
-	};
-
 	Process *current_process_ptr = nullptr;
 	Process *idle_process_ptr = nullptr;
 
@@ -56,31 +56,37 @@ namespace OS
 		cpu->turn_off();
 	}
 
-	MemoryInterval *find_free_memory_interval(const uint32_t size)
+	std::list<MemoryInterval>::iterator find_free_memory_interval(const uint16_t size)
 	{
-		for (auto &interval : free_memory_intervals)
+		for (auto it = free_memory_intervals.begin(); it != free_memory_intervals.end(); ++it)
 		{
-			if ((interval.end - interval.start + 1) >= size)
-			{
-				return &interval;
-			}
+			if (it->end - it->start + 1 >= size)
+				return it;
 		}
-		return nullptr;
+		return free_memory_intervals.end();
 	}
 
-	MemoryInterval allocate_memory(const uint32_t size)
+	MemoryInterval allocate_memory(const uint16_t size)
 	{
-		MemoryInterval *interval = find_free_memory_interval(size);
-		if (interval == nullptr)
+		auto iterator = find_free_memory_interval(size);
+		if (iterator == free_memory_intervals.end())
 			return {1, 0};
 
-		MemoryInterval new_memory = {interval->start, interval->start + size - 1};
-		interval->start += size;
+		MemoryInterval *interval = &(*iterator);
 
-		if (interval->start > interval->end)
-			free_memory_intervals.erase(std::remove(free_memory_intervals.begin(), free_memory_intervals.end(), *interval), free_memory_intervals.end());
+		MemoryInterval new_memory = {interval->start, (interval->start + size - 1)};
+
+		if (interval->end - interval->start + 1 == size)
+			free_memory_intervals.erase(iterator);
+		else
+			interval->start += size;
 
 		return new_memory;
+	}
+
+	void desallocate_memory(const MemoryInterval &memory)
+	{
+		free_memory_intervals.push_back(memory);
 	}
 
 	Process *create_process(const std::string_view fname)
@@ -94,22 +100,17 @@ namespace OS
 
 			MemoryInterval memory = allocate_memory(bin.size());
 
-			process->pc = 1;
-
-			if (idle_process_ptr == nullptr)
-				process->baser = 0;
-
-			else if (ready_processes.empty())
-				process->baser = idle_process_ptr->limitr + 1;
-
-			else
+			if (memory.start == 1 && memory.end == 0)
 			{
-
-				Process *last_process = ready_processes.back();
-				process->baser = last_process->limitr + 1;
+				terminal->println(Arch::Terminal::Type::Kernel, "Not enough memory to create process\n");
+				return nullptr;
 			}
 
-			process->limitr = (process->baser + size) - 1;
+			process->pc = 1;
+
+			process->baser = memory.start;
+
+			process->limitr = memory.end;
 
 			for (uint32_t i = 0; i < Config::nregs; i++)
 				process->registers[i] = 0;
@@ -117,45 +118,31 @@ namespace OS
 			process->state = Process::State::Ready;
 
 			for (uint32_t i = 0; i < bin.size(); i++)
-				cpu->pmem_write(i + process->baser, bin[i]);
-
-			if (process != idle_process_ptr)
-			{
-				ready_processes.push_back(process);
-				ready_processes_begin = ready_processes.begin();
-			}
+				cpu->pmem_write(process->baser + i, bin[i]);
 
 			process->name = fname.substr(4);
 
 			terminal->println(Arch::Terminal::Type::Kernel, "Process " + process->name + " created\n");
+
+			if (process->name != "idle.bin")
+			{
+				terminal->println(Arch::Terminal::Type::Kernel, "Processo inserido nos prontos\n");
+				ready_processes.push_back(process);
+				ready_processes_begin = ready_processes.begin();
+			}
 
 			return process;
 		}
 		return nullptr;
 	}
 
-	void unschedule_process()
-	{
-		Process *process = current_process_ptr;
-
-		if (current_process_ptr == nullptr)
-			panic("No process to unschedule");
-
-		process->state = Process::State::Ready;
-		for (uint32_t i = 0; i < Config::nregs; i++)
-			process->registers[i] = cpu->get_gpr(i);
-
-		process->pc = cpu->get_pc();
-
-		current_process_ptr = nullptr;
-
-		terminal->println(Arch::Terminal::Type::Kernel, "Unschedule process: " + process->name + "\n");
-	}
-
 	void schedule_process(Process *process)
 	{
 		if (current_process_ptr != nullptr)
 			panic("Process already scheduled");
+
+		if (process->state != Process::State::Ready)
+			panic("Process not ready");
 
 		terminal->println(Arch::Terminal::Type::Kernel, "Running process: " + process->name + "\n");
 
@@ -168,6 +155,27 @@ namespace OS
 
 		for (uint32_t i = 0; i < Config::nregs; i++)
 			cpu->set_gpr(i, process->registers[i]);
+	}
+
+	void unschedule_process()
+	{
+		Process *process = current_process_ptr;
+
+		if (current_process_ptr == nullptr)
+			panic("No process to unschedule");
+
+		if (process->state != Process::State::Running)
+			panic("Process not running");
+
+		process->state = Process::State::Ready;
+		for (uint32_t i = 0; i < Config::nregs; i++)
+			process->registers[i] = cpu->get_gpr(i);
+
+		process->pc = cpu->get_pc();
+
+		current_process_ptr = nullptr;
+
+		terminal->println(Arch::Terminal::Type::Kernel, "Unschedule process: " + process->name + "\n");
 	}
 
 	Process *search_process(const std::string_view fname)
@@ -183,33 +191,55 @@ namespace OS
 
 	void round_robin()
 	{
-		if (current_process_ptr == idle_process_ptr)
-			return;
-
-		if (ready_processes.empty())
-			return;
-
-		ready_processes_begin++;
-		if (ready_processes_begin == ready_processes.end())
+		if (current_process_ptr != idle_process_ptr && ready_processes.size() > 1)
 		{
-			ready_processes_begin = ready_processes.begin();
+			ready_processes_begin++;
+			if (ready_processes_begin == ready_processes.end())
+			{
+				ready_processes_begin = ready_processes.begin();
+			}
+
+			Process *process = *ready_processes_begin;
+
+			unschedule_process();
+			schedule_process(process);
 		}
+	}
 
-		Process *process = *ready_processes_begin;
+	void list_processes()
+	{
+		terminal->println(Arch::Terminal::Type::Command, "Processes:\n");
+		for (auto it = ready_processes.begin(); it != ready_processes.end(); it++)
+		{
+			Process *process = *it;
+			terminal->println(Arch::Terminal::Type::Command, process->name + "|" + std::to_string(process->baser) + "|" + std::to_string(process->limitr) + "\n");
+		}
+	}
 
-		unschedule_process();
-		schedule_process(process);
+	void print_all_memory()
+	{
+		for (uint16_t i = 0; i < 60; i++)
+		{
+			terminal->print(Arch::Terminal::Type::Command, std::to_string(cpu->pmem_read(i)) + " ");
+		}
+		terminal->println(Arch::Terminal::Type::Command, "\n");
 	}
 
 	void kill(Process *process)
 	{
-		for (uint32_t i = process->baser; i <= process->limitr; i++)
-			cpu->pmem_write(i, 0);
+		if (process->state == Process::State::Running)
+			panic("Process running");
 
+		desallocate_memory({process->baser, process->limitr});
 		terminal->println(Arch::Terminal::Type::Command, "Process " + process->name + " killed\n");
 		terminal->println(Arch::Terminal::Type::Kernel, "Process " + process->name + " killed\n");
-		ready_processes.erase(std::remove(ready_processes.begin(), ready_processes.end(), process), ready_processes.end());
+
+		// ready_processes.erase(std::remove(ready_processes.begin(), ready_processes.end(), process), ready_processes.end());
+		// std::remove(ready_processes.begin(), ready_processes.end(), process);
+		ready_processes.remove(process);
 		delete process;
+
+		ready_processes_begin = ready_processes.begin();
 	}
 
 	void verify_command()
@@ -236,6 +266,19 @@ namespace OS
 				terminal->println(Arch::Terminal::Type::Command, "File " + filename + " not found\n");
 			}
 		}
+
+		else if (typedCharacters == "ls")
+		{
+			typedCharacters.clear();
+			list_processes();
+		}
+
+		else if (typedCharacters == "mem")
+		{
+			typedCharacters.clear();
+			print_all_memory();
+		}
+
 		else if (typedCharacters.find("kill ") == 0)
 		{
 			typedCharacters.erase(0, 5);
@@ -248,9 +291,18 @@ namespace OS
 				{
 					if (process == current_process_ptr)
 					{
-						unschedule_process();
-						kill(process);
-						schedule_process(idle_process_ptr);
+						Process *process_to_kill = current_process_ptr;
+						if (ready_processes.size() == 1)
+						{
+							unschedule_process();
+							schedule_process(idle_process_ptr);
+							kill(process_to_kill);
+						}
+						else
+						{
+							round_robin();
+							kill(process_to_kill);
+						}
 					}
 					else
 					{
@@ -309,7 +361,10 @@ namespace OS
 		terminal->println(Arch::Terminal::Type::App, "Apps output here");
 		terminal->println(Arch::Terminal::Type::Kernel, "Kernel output here");
 		idle_process_ptr = create_process("bin/idle.bin");
-		schedule_process(idle_process_ptr);
+		if (idle_process_ptr == nullptr)
+			panic("Idle process not created");
+		else
+			schedule_process(idle_process_ptr);
 	}
 
 	void interrupt(const Arch::InterruptCode interrupt)
@@ -324,12 +379,17 @@ namespace OS
 		else if (interrupt == Arch::InterruptCode::GPF)
 		{
 			terminal->println(Arch::Terminal::Type::Kernel, "General Protection Fault\n");
-			if (current_process_ptr != idle_process_ptr)
+			Process *process_to_kill = current_process_ptr;
+			if (ready_processes.size() == 1)
 			{
-				Process *process_to_kill = current_process_ptr;
 				unschedule_process();
-				kill(process_to_kill);
 				schedule_process(idle_process_ptr);
+				kill(process_to_kill);
+			}
+			else
+			{
+				round_robin();
+				kill(process_to_kill);
 			}
 		}
 	}
@@ -341,9 +401,17 @@ namespace OS
 		switch (cpu->get_gpr(0))
 		{
 		case 0:
+			if (ready_processes.size() == 1)
+			{
+				unschedule_process();
+				schedule_process(idle_process_ptr);
+				kill(process_to_kill);
+				break;
+			}
 			round_robin();
 			kill(process_to_kill);
 			break;
+
 		case 1:
 		{
 			uint16_t addr = cpu->get_gpr(1);
