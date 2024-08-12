@@ -86,6 +86,11 @@ namespace OS
 
 	void desallocate_memory(const MemoryInterval &memory)
 	{
+		for (uint32_t i = memory.start; i <= memory.end; ++i)
+		{
+			cpu->pmem_write(i, 0);
+		}
+
 		free_memory_intervals.push_back(memory);
 	}
 
