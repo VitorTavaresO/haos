@@ -382,12 +382,15 @@ namespace OS
 			Process *process_to_kill = current_process_ptr;
 			if (ready_processes.size() == 1)
 			{
+				terminal->println(Arch::Terminal::Type::Kernel, "Caiu no 1\n");
 				unschedule_process();
 				schedule_process(idle_process_ptr);
 				kill(process_to_kill);
 			}
 			else
 			{
+				terminal->println(Arch::Terminal::Type::Kernel, "Caiu no 2\n");
+				ready_processes_begin++;
 				round_robin();
 				kill(process_to_kill);
 			}
