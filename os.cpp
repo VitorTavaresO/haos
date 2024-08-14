@@ -15,10 +15,6 @@
 
 namespace OS
 {
-	Arch::Terminal *terminal;
-	Arch::Cpu *cpu;
-
-	std::string typedCharacters;
 
 	struct MemoryInterval
 	{
@@ -28,6 +24,7 @@ namespace OS
 
 	struct Process
 	{
+		uint16_t pid;
 		std::string name;
 		uint16_t pc;
 		std::array<uint16_t, Config::nregs> registers;
@@ -41,6 +38,11 @@ namespace OS
 		uint16_t baser;
 		uint16_t limitr;
 	};
+
+	Arch::Terminal *terminal;
+	Arch::Cpu *cpu;
+
+	std::string typedCharacters;
 
 	Process *current_process_ptr = nullptr;
 	Process *idle_process_ptr = nullptr;
@@ -131,7 +133,6 @@ namespace OS
 
 			if (process->name != "idle.bin")
 			{
-				terminal->println(Arch::Terminal::Type::Kernel, "Processo inserido nos prontos\n");
 				ready_processes.push_back(process);
 				ready_processes_begin = ready_processes.begin();
 			}
@@ -198,13 +199,10 @@ namespace OS
 	{
 		if (current_process_ptr != idle_process_ptr && ready_processes.size() > 1)
 		{
-			ready_processes_begin++;
-			if (ready_processes_begin == ready_processes.end())
-			{
-				ready_processes_begin = ready_processes.begin();
-			}
-
 			Process *process = *ready_processes_begin;
+			ready_processes.push_back(process);
+			ready_processes.pop_front();
+			ready_processes_begin = ready_processes.begin();
 
 			unschedule_process();
 			schedule_process(process);
@@ -233,7 +231,10 @@ namespace OS
 	void kill(Process *process)
 	{
 		if (process->state == Process::State::Running)
+		{
+			terminal->println(Arch::Terminal::Type::Kernel, "Process " + process->name + " killed\n");
 			panic("Process running");
+		}
 
 		desallocate_memory({process->baser, process->limitr});
 		terminal->println(Arch::Terminal::Type::Command, "Process " + process->name + " killed\n");
@@ -387,15 +388,13 @@ namespace OS
 			Process *process_to_kill = current_process_ptr;
 			if (ready_processes.size() == 1)
 			{
-				terminal->println(Arch::Terminal::Type::Kernel, "Caiu no 1\n");
 				unschedule_process();
 				schedule_process(idle_process_ptr);
 				kill(process_to_kill);
 			}
 			else
 			{
-				terminal->println(Arch::Terminal::Type::Kernel, "Caiu no 2\n");
-				ready_processes_begin++;
+				ready_processes_begin = ready_processes.begin();
 				round_robin();
 				kill(process_to_kill);
 			}
