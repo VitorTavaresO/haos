@@ -232,7 +232,6 @@ namespace OS
 	{
 		if (process->state == Process::State::Running)
 		{
-			terminal->println(Arch::Terminal::Type::Kernel, "Process " + process->name + " killed\n");
 			panic("Process running");
 		}
 
