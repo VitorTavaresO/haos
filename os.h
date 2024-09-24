@@ -9,17 +9,18 @@
 #include "config.h"
 #include "arq-sim.h"
 
-namespace OS {
+namespace OS
+{
 
-// ---------------------------------------
+    // ---------------------------------------
 
-void boot (Arch::Terminal *terminal, Arch::Cpu *cpu);
+    void boot(Arch::Terminal *terminal, Arch::Cpu *cpu);
 
-void interrupt (const Arch::InterruptCode interrupt);
+    void interrupt(const Arch::InterruptCode interrupt);
 
-void syscall ();
+    void syscall();
 
-// ---------------------------------------
+    // ---------------------------------------
 
 } // end namespace
 

@@ -261,6 +261,17 @@ namespace Arch
 		}
 	};
 
+	struct PageTableBase
+	{
+		uint32_t frame_number;
+		bool valid;
+	};
+
+	struct PageTable
+	{
+		std::vector<PageTableBase> frames;
+	};
+
 	// ---------------------------------------
 
 } // end namespace

@@ -15,6 +15,7 @@
 
 namespace OS
 {
+	using Arch::PageTable;
 
 	struct MemoryInterval
 	{
@@ -35,9 +36,17 @@ namespace OS
 			Blocked
 		};
 		State state;
-		uint16_t baser;
-		uint16_t limitr;
+		PageTable page_table;
 	};
+
+	void init_page_table(PageTable &page_table, size_t num_pages)
+	{
+		page_table.frames.resize(num_pages);
+		for (uint32_t i = 0; i < num_pages; ++i)
+		{
+			page_table.frames[i] = {i, false};
+		}
+	}
 
 	Arch::Terminal *terminal;
 	Arch::Cpu *cpu;

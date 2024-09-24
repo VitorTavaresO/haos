@@ -242,24 +242,18 @@ namespace Arch
 
 	// ---------------------------------------
 
-	struct PageTableBase
+	uint32_t translate(const PageTable &page_table, uint32_t virtual_address)
 	{
-		uint32_t frame_number;
-		bool valid;
-	};
+		uint32_t page_number = virtual_address / Config::page_size_words;
+		uint32_t offset = virtual_address % Config::page_size_words;
 
-	struct PageTable
-	{
-		std::vector<PageTableBase> frames;
-	};
-
-	void init_page_table(PageTable &page_table, size_t num_pages)
-	{
-		page_table.frames.resize(num_pages);
-		for (uint32_t i = 0; i < num_pages; ++i)
+		if (page_number >= page_table.frames.size() || !page_table.frames[page_number].valid)
 		{
-			page_table.frames[i] = {i, false};
+			throw std::runtime_error("Invalid virtual address");
 		}
+
+		uint32_t frame_number = page_table.frames[page_number].frame_number;
+		return frame_number * Config::page_size_words + offset;
 	}
 
 	Memory::Memory()
