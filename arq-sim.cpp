@@ -242,6 +242,28 @@ namespace Arch
 
 	// ---------------------------------------
 
+	struct PageTableBase
+	{
+		uint32_t frame_number;
+		bool valid;
+	};
+
+	struct PageTable
+	{
+		std::vector<PageTableBase> frames;
+	} page_table;
+
+	void init_page_table()
+	{
+		size_t num_pages = Config::memsize_words / Config::page_size_words;
+		page_table.frames.resize(num_pages);
+		for (uint32_t i = 0; i < num_pages; ++i)
+		{
+			page_table.frames[i] = {i, false};
+		}
+	}
+	// Tem que ser uma tabela de paginas por processo, o SO tem que criar isso.
+
 	Memory::Memory()
 	{
 		for (auto &v : this->data)
