@@ -243,7 +243,7 @@ namespace Arch
 			if (page_number >= page_table->frames.size() || !page_table->frames[page_number].valid)
 			{
 				this->force_interrupt(InterruptCode::GPF);
-				// Criar Expcetion
+				throw Mylib::Exception("Invalid page number");
 			}
 
 			uint32_t frame_number = page_table->frames[page_number].frame_number;
@@ -252,14 +252,28 @@ namespace Arch
 
 		inline uint16_t vmem_read(const uint16_t vaddr)
 		{
-			const uint16_t paddr = translate(this->page_table, vaddr);
-			return this->pmem_read(paddr);
+			try
+			{
+				const uint16_t paddr = translate(this->page_table, vaddr);
+				return this->pmem_read(paddr);
+			}
+			catch (const Mylib::Exception &e)
+			{
+				throw e;
+			}
 		}
 
 		inline void vmem_write(const uint16_t vaddr, const uint16_t value)
 		{
-			const uint16_t paddr = translate(this->page_table, vaddr);
-			this->pmem_write(paddr, value);
+			try
+			{
+				const uint16_t paddr = translate(this->page_table, vaddr);
+				this->pmem_write(paddr, value);
+			}
+			catch (const Mylib::Exception &e)
+			{
+				throw e;
+			}
 		}
 	};
 
