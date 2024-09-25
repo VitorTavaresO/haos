@@ -198,6 +198,7 @@ namespace Arch
 
 	private:
 		Memory &memory;
+		PageTable *page_table;
 
 	public:
 		Cpu();
@@ -234,29 +235,30 @@ namespace Arch
 		void execute_r(const Mylib::BitSet<16> instruction);
 		void execute_i(const Mylib::BitSet<16> instruction);
 
-		inline uint16_t vmem_read(const uint16_t vaddr)
+		inline uint32_t translate(const PageTable *page_table, uint32_t virtual_address)
 		{
-			const uint16_t paddr = vaddr + this->vmem_paddr_init;
+			uint32_t page_number = virtual_address / Config::page_size_words;
+			uint32_t offset = virtual_address % Config::page_size_words;
 
-			if (paddr > this->vmem_paddr_end)
+			if (page_number >= page_table->frames.size() || !page_table->frames[page_number].valid)
 			{
 				this->force_interrupt(InterruptCode::GPF);
-				return 0;
+				// Criar Expcetion
 			}
 
+			uint32_t frame_number = page_table->frames[page_number].frame_number;
+			return frame_number * Config::page_size_words + offset;
+		}
+
+		inline uint16_t vmem_read(const uint16_t vaddr)
+		{
+			const uint16_t paddr = translate(this->page_table, vaddr);
 			return this->pmem_read(paddr);
 		}
 
 		inline void vmem_write(const uint16_t vaddr, const uint16_t value)
 		{
-			const uint16_t paddr = vaddr + this->vmem_paddr_init;
-
-			if (paddr > this->vmem_paddr_end)
-			{
-				this->force_interrupt(InterruptCode::GPF);
-				return;
-			}
-
+			const uint16_t paddr = translate(this->page_table, vaddr);
 			this->pmem_write(paddr, value);
 		}
 	};

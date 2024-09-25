@@ -14,7 +14,9 @@ namespace Config
 
 	inline constexpr uint32_t timer_interrupt_cycles = 1024;
 
-	inline constexpr uint16_t page_size_words = 1 << 5;
+	inline constexpr uint32_t virtual_space_size = 1 << 16;
+
+	inline constexpr uint16_t page_size_words = 1 << 4;
 
 }
 

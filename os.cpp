@@ -15,6 +15,7 @@
 
 namespace OS
 {
+
 	using Arch::PageTable;
 
 	struct MemoryInterval
@@ -36,17 +37,10 @@ namespace OS
 			Blocked
 		};
 		State state;
+		uint16_t baser;
+		uint16_t limitr;
 		PageTable page_table;
 	};
-
-	void init_page_table(PageTable &page_table, size_t num_pages)
-	{
-		page_table.frames.resize(num_pages);
-		for (uint32_t i = 0; i < num_pages; ++i)
-		{
-			page_table.frames[i] = {i, false};
-		}
-	}
 
 	Arch::Terminal *terminal;
 	Arch::Cpu *cpu;
@@ -65,6 +59,16 @@ namespace OS
 	{
 		terminal->println(Arch::Terminal::Type::Kernel, "Kernel Panic: " + std::string(msg));
 		cpu->turn_off();
+	}
+
+	void init_page_table(PageTable &page_table)
+	{
+		const uint32_t num_pages = Config::virtual_space_size / Config::page_size_words;
+		page_table.frames.resize(num_pages);
+		for (uint32_t i = 0; i < num_pages; ++i)
+		{
+			page_table.frames[i] = {i, false};
+		}
 	}
 
 	std::list<MemoryInterval>::iterator find_free_memory_interval(const uint16_t size)
