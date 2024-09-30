@@ -251,7 +251,6 @@ namespace Arch
 			if (page_number >= page_table->frames.size() || !page_table->frames[page_number].valid)
 			{
 				this->force_interrupt(InterruptCode::GPF);
-				throw Mylib::Exception("Invalid page number");
 			}
 
 			uint32_t frame_number = page_table->frames[page_number].frame_number;
@@ -275,7 +274,7 @@ namespace Arch
 			}
 			catch (const Mylib::Exception &e)
 			{
-				throw e;
+				this->force_interrupt(InterruptCode::GPF);
 			}
 		}
 
@@ -288,7 +287,7 @@ namespace Arch
 			}
 			catch (const Mylib::Exception &e)
 			{
-				throw e;
+				this->force_interrupt(InterruptCode::GPF);
 			}
 		}
 	};

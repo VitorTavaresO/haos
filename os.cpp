@@ -81,7 +81,7 @@ namespace OS
 	{
 		for (uint32_t i = 0; i < free_frames.size(); ++i)
 		{
-			if (!free_frames[i].free)
+			if (free_frames[i].free)
 			{
 				free_frames[i].free = false;
 				free_frames[i].process = process;
@@ -188,7 +188,6 @@ namespace OS
 				ready_processes.push_back(process);
 				ready_processes_begin = ready_processes.begin();
 			}
-
 			return process;
 		}
 		return nullptr;
@@ -474,6 +473,8 @@ namespace OS
 			uint16_t addr = cpu->get_gpr(1);
 
 			addr = cpu->translate(&current_process_ptr->page_table, addr);
+
+			terminal->println(Arch::Terminal::Type::Kernel, "Printing string at address " + std::to_string(addr) + "\n");
 
 			while (cpu->pmem_read(addr) != 0)
 			{
