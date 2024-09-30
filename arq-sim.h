@@ -27,6 +27,17 @@
 namespace Arch
 {
 
+	struct PageTableBase
+	{
+		uint32_t frame_number;
+		bool valid;
+	};
+
+	struct PageTable
+	{
+		std::vector<PageTableBase> frames;
+	};
+
 	// ---------------------------------------
 
 	enum class InterruptCode : uint16_t
@@ -207,6 +218,11 @@ namespace Arch
 		void run_cycle();
 		void dump() const;
 
+		void set_page_table(PageTable *page_table)
+		{
+			this->page_table = page_table;
+		}
+
 		inline uint16_t get_gpr(const uint8_t code) const
 		{
 			mylib_assert_exception(code < this->gprs.size()) return this->gprs[code];
@@ -242,11 +258,6 @@ namespace Arch
 			return frame_number * Config::page_size_words + offset;
 		}
 
-		void set_page_table(PageTable *page_table)
-		{
-			this->page_table = page_table;
-		}
-
 		bool interrupt(const InterruptCode interrupt_code);
 		void force_interrupt(const InterruptCode interrupt_code);
 		void turn_off();
@@ -280,17 +291,6 @@ namespace Arch
 				throw e;
 			}
 		}
-	};
-
-	struct PageTableBase
-	{
-		uint32_t frame_number;
-		bool valid;
-	};
-
-	struct PageTable
-	{
-		std::vector<PageTableBase> frames;
 	};
 
 	// ---------------------------------------

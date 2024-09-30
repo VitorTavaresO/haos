@@ -43,7 +43,7 @@ namespace OS
 	struct Frame
 	{
 		Process *process;
-		bool valid;
+		bool free;
 	};
 
 	Arch::Terminal *terminal;
@@ -59,7 +59,7 @@ namespace OS
 
 	std::list<MemoryInterval> free_memory_intervals = {{0, Config::memsize_words - 1}};
 
-	std::vector<Frame> free_frames(Config::memsize_words / Config::page_size_words, {nullptr, false});
+	std::vector<Frame> free_frames(Config::memsize_words / Config::page_size_words, {nullptr, true});
 
 	void panic(const std::string_view msg)
 	{
@@ -77,14 +77,27 @@ namespace OS
 		}
 	}
 
-	uint32_t allocate_frame()
+	uint32_t allocate_frame(Process *process)
 	{
 		for (uint32_t i = 0; i < free_frames.size(); ++i)
 		{
-			if (!free_frames[i].valid)
+			if (!free_frames[i].free)
 			{
-				free_frames[i].valid = true;
+				free_frames[i].free = false;
+				free_frames[i].process = process;
 				return i;
+			}
+		}
+	}
+
+	void desallocate_frame(Process *process)
+	{
+		for (auto &frame : free_frames)
+		{
+			if (frame.process == process)
+			{
+				frame.free = true;
+				frame.process = nullptr;
 			}
 		}
 	}
@@ -156,7 +169,7 @@ namespace OS
 			const uint32_t num_pages = (bin.size() / Config::page_size_words) + ((bin.size() % Config::page_size_words) != 0 ? 1 : 0);
 			for (uint32_t i = 0; i < num_pages; ++i)
 			{
-				process->page_table.frames[i] = {allocate_frame(), true};
+				process->page_table.frames[i] = {allocate_frame(process), true};
 			}
 
 			for (uint32_t i = 0; i < bin.size(); i++)
@@ -195,8 +208,7 @@ namespace OS
 		current_process_ptr = process;
 
 		cpu->set_pc(process->pc);
-		cpu->set_vmem_paddr_init(process->baser);
-		cpu->set_vmem_paddr_end(process->limitr);
+		cpu->set_page_table(&process->page_table);
 
 		for (uint32_t i = 0; i < Config::nregs; i++)
 			cpu->set_gpr(i, process->registers[i]);
@@ -254,7 +266,7 @@ namespace OS
 		for (auto it = ready_processes.begin(); it != ready_processes.end(); it++)
 		{
 			Process *process = *it;
-			terminal->println(Arch::Terminal::Type::Command, process->name + "|" + std::to_string(process->baser) + "|" + std::to_string(process->limitr) + "\n");
+			terminal->println(Arch::Terminal::Type::Command, process->name + "\n");
 		}
 	}
 
@@ -274,7 +286,7 @@ namespace OS
 			panic("Process running");
 		}
 
-		desallocate_memory({process->baser, process->limitr});
+		desallocate_frame(process);
 		terminal->println(Arch::Terminal::Type::Command, "Process " + process->name + " killed\n");
 		terminal->println(Arch::Terminal::Type::Kernel, "Process " + process->name + " killed\n");
 
@@ -461,7 +473,7 @@ namespace OS
 		{
 			uint16_t addr = cpu->get_gpr(1);
 
-			addr = addr + current_process_ptr->baser;
+			addr = cpu->translate(&current_process_ptr->page_table, addr);
 
 			while (cpu->pmem_read(addr) != 0)
 			{
