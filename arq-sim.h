@@ -242,6 +242,11 @@ namespace Arch
 			return frame_number * Config::page_size_words + offset;
 		}
 
+		void set_page_table(PageTable *page_table)
+		{
+			this->page_table = page_table;
+		}
+
 		bool interrupt(const InterruptCode interrupt_code);
 		void force_interrupt(const InterruptCode interrupt_code);
 		void turn_off();
