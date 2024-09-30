@@ -227,15 +227,7 @@ namespace Arch
 			this->memory[paddr] = value;
 		}
 
-		bool interrupt(const InterruptCode interrupt_code);
-		void force_interrupt(const InterruptCode interrupt_code);
-		void turn_off();
-
-	private:
-		void execute_r(const Mylib::BitSet<16> instruction);
-		void execute_i(const Mylib::BitSet<16> instruction);
-
-		inline uint32_t translate(const PageTable *page_table, uint32_t virtual_address)
+		inline uint32_t translate(PageTable *page_table, uint32_t virtual_address)
 		{
 			uint32_t page_number = virtual_address / Config::page_size_words;
 			uint32_t offset = virtual_address % Config::page_size_words;
@@ -249,6 +241,14 @@ namespace Arch
 			uint32_t frame_number = page_table->frames[page_number].frame_number;
 			return frame_number * Config::page_size_words + offset;
 		}
+
+		bool interrupt(const InterruptCode interrupt_code);
+		void force_interrupt(const InterruptCode interrupt_code);
+		void turn_off();
+
+	private:
+		void execute_r(const Mylib::BitSet<16> instruction);
+		void execute_i(const Mylib::BitSet<16> instruction);
 
 		inline uint16_t vmem_read(const uint16_t vaddr)
 		{

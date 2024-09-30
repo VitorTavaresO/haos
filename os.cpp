@@ -37,9 +37,13 @@ namespace OS
 			Blocked
 		};
 		State state;
-		uint16_t baser;
-		uint16_t limitr;
 		PageTable page_table;
+	};
+
+	struct Frame
+	{
+		Process *process;
+		bool valid;
 	};
 
 	Arch::Terminal *terminal;
@@ -55,6 +59,8 @@ namespace OS
 
 	std::list<MemoryInterval> free_memory_intervals = {{0, Config::memsize_words - 1}};
 
+	std::vector<Frame> free_frames(Config::memsize_words / Config::page_size_words, {nullptr, false});
+
 	void panic(const std::string_view msg)
 	{
 		terminal->println(Arch::Terminal::Type::Kernel, "Kernel Panic: " + std::string(msg));
@@ -68,6 +74,18 @@ namespace OS
 		for (uint32_t i = 0; i < num_pages; ++i)
 		{
 			page_table.frames[i] = {i, false};
+		}
+	}
+
+	uint32_t allocate_frame()
+	{
+		for (uint32_t i = 0; i < free_frames.size(); ++i)
+		{
+			if (!free_frames[i].valid)
+			{
+				free_frames[i].valid = true;
+				return i;
+			}
 		}
 	}
 
@@ -128,17 +146,25 @@ namespace OS
 
 			process->pc = 1;
 
-			process->baser = memory.start;
-
-			process->limitr = memory.end;
-
 			for (uint32_t i = 0; i < Config::nregs; i++)
 				process->registers[i] = 0;
 
 			process->state = Process::State::Ready;
 
+			init_page_table(process->page_table);
+
+			const uint32_t num_pages = (bin.size() / Config::page_size_words) + ((bin.size() % Config::page_size_words) != 0 ? 1 : 0);
+			for (uint32_t i = 0; i < num_pages; ++i)
+			{
+				process->page_table.frames[i] = {allocate_frame(), true};
+			}
+
 			for (uint32_t i = 0; i < bin.size(); i++)
-				cpu->pmem_write(process->baser + i, bin[i]);
+			{
+				uint32_t vaddr = i;
+				uint32_t paddr = cpu->translate(&process->page_table, vaddr);
+				cpu->pmem_write(paddr, bin[i]);
+			}
 
 			process->name = fname.substr(4);
 
