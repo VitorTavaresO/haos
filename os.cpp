@@ -54,6 +54,8 @@ namespace OS
 	Process *current_process_ptr = nullptr;
 	Process *idle_process_ptr = nullptr;
 
+	float actual_app_time = 0.0f;
+
 	std::list<Process *> ready_processes;
 	std::list<Process *>::iterator ready_processes_begin = ready_processes.begin();
 
@@ -278,226 +280,235 @@ namespace OS
 		terminal->println(Arch::Terminal::Type::Command, "\n");
 	}
 
-	void sleep(const uint32_t s)
+	void sleep(Process *process)
 	{
+		process->state = Process::State::Blocked;
+		actual_app_time = time;
 	}
 
-	void kill(Process *process)
+}
+
+void kill(Process *process)
+{
+	if (process->state == Process::State::Running)
 	{
-		if (process->state == Process::State::Running)
-		{
-			panic("Process running");
-		}
-
-		desallocate_frame(process);
-		terminal->println(Arch::Terminal::Type::Command, "Process " + process->name + " killed\n");
-		terminal->println(Arch::Terminal::Type::Kernel, "Process " + process->name + " killed\n");
-
-		// ready_processes.erase(std::remove(ready_processes.begin(), ready_processes.end(), process), ready_processes.end());
-		// std::remove(ready_processes.begin(), ready_processes.end(), process);
-		ready_processes.remove(process);
-		delete process;
-
-		ready_processes_begin = ready_processes.begin();
+		panic("Process running");
 	}
 
-	void verify_command()
+	desallocate_frame(process);
+	terminal->println(Arch::Terminal::Type::Command, "Process " + process->name + " killed\n");
+	terminal->println(Arch::Terminal::Type::Kernel, "Process " + process->name + " killed\n");
+
+	// ready_processes.erase(std::remove(ready_processes.begin(), ready_processes.end(), process), ready_processes.end());
+	// std::remove(ready_processes.begin(), ready_processes.end(), process);
+	ready_processes.remove(process);
+	delete process;
+
+	ready_processes_begin = ready_processes.begin();
+}
+
+void verify_command()
+{
+	if (typedCharacters == "quit")
 	{
-		if (typedCharacters == "quit")
-		{
-			typedCharacters.clear();
-			cpu->turn_off();
-		}
+		typedCharacters.clear();
+		cpu->turn_off();
+	}
 
-		else if (typedCharacters.find("run ") == 0)
+	else if (typedCharacters.find("run ") == 0)
+	{
+		typedCharacters.erase(0, 4);
+		std::string filename = typedCharacters;
+		typedCharacters.clear();
+		if (std::filesystem::exists(filename))
 		{
-			typedCharacters.erase(0, 4);
-			std::string filename = typedCharacters;
-			typedCharacters.clear();
-			if (std::filesystem::exists(filename))
+			terminal->println(Arch::Terminal::Type::Command, "Running file:" + filename + "\n");
+			unschedule_process();
+			schedule_process(create_process(filename));
+		}
+		else
+		{
+			terminal->println(Arch::Terminal::Type::Command, "File " + filename + " not found\n");
+		}
+	}
+
+	else if (typedCharacters == "ls")
+	{
+		typedCharacters.clear();
+		list_processes();
+	}
+
+	else if (typedCharacters == "mem")
+	{
+		typedCharacters.clear();
+		print_all_memory();
+	}
+
+	else if (typedCharacters.find("kill ") == 0)
+	{
+		typedCharacters.erase(0, 5);
+		std::string filename = typedCharacters;
+		typedCharacters.clear();
+		if (current_process_ptr != idle_process_ptr)
+		{
+			Process *process = search_process(filename);
+			if (process != nullptr)
 			{
-				terminal->println(Arch::Terminal::Type::Command, "Running file:" + filename + "\n");
-				unschedule_process();
-				schedule_process(create_process(filename));
-			}
-			else
-			{
-				terminal->println(Arch::Terminal::Type::Command, "File " + filename + " not found\n");
-			}
-		}
-
-		else if (typedCharacters == "ls")
-		{
-			typedCharacters.clear();
-			list_processes();
-		}
-
-		else if (typedCharacters == "mem")
-		{
-			typedCharacters.clear();
-			print_all_memory();
-		}
-
-		else if (typedCharacters.find("kill ") == 0)
-		{
-			typedCharacters.erase(0, 5);
-			std::string filename = typedCharacters;
-			typedCharacters.clear();
-			if (current_process_ptr != idle_process_ptr)
-			{
-				Process *process = search_process(filename);
-				if (process != nullptr)
+				if (process == current_process_ptr)
 				{
-					if (process == current_process_ptr)
+					Process *process_to_kill = current_process_ptr;
+					if (ready_processes.size() == 1)
 					{
-						Process *process_to_kill = current_process_ptr;
-						if (ready_processes.size() == 1)
-						{
-							unschedule_process();
-							schedule_process(idle_process_ptr);
-							kill(process_to_kill);
-						}
-						else
-						{
-							round_robin();
-							kill(process_to_kill);
-						}
+						unschedule_process();
+						schedule_process(idle_process_ptr);
+						kill(process_to_kill);
 					}
 					else
 					{
-						kill(process);
+						round_robin();
+						kill(process_to_kill);
 					}
 				}
 				else
 				{
-					terminal->println(Arch::Terminal::Type::Command, "No process with this name to kill\n");
+					kill(process);
 				}
 			}
 			else
 			{
-				terminal->println(Arch::Terminal::Type::Command, "No process to kill");
+				terminal->println(Arch::Terminal::Type::Command, "No process with this name to kill\n");
 			}
 		}
 		else
 		{
-			terminal->println(Arch::Terminal::Type::Command, "Unknown command");
-			typedCharacters.clear();
+			terminal->println(Arch::Terminal::Type::Command, "No process to kill");
+		}
+	}
+	else
+	{
+		terminal->println(Arch::Terminal::Type::Command, "Unknown command");
+		typedCharacters.clear();
+	}
+}
+
+void write_command()
+{
+	int typed = terminal->read_typed_char();
+
+	if (terminal->is_alpha(typed) || terminal->is_num(typed) || typed == ' ' || typed == '-' || typed == '.' || typed == '/')
+	{
+		typedCharacters.push_back(static_cast<char>(typed));
+		terminal->print(Arch::Terminal::Type::Command, static_cast<char>(typed));
+	}
+
+	else if (terminal->is_backspace(typed))
+	{
+		if (!typedCharacters.empty())
+		{
+			typedCharacters.pop_back();
+			terminal->print(Arch::Terminal::Type::Command, "\r");
+			terminal->print(Arch::Terminal::Type::Command, typedCharacters);
 		}
 	}
 
-	void write_command()
+	else if (terminal->is_return(typed))
 	{
-		int typed = terminal->read_typed_char();
-
-		if (terminal->is_alpha(typed) || terminal->is_num(typed) || typed == ' ' || typed == '-' || typed == '.' || typed == '/')
-		{
-			typedCharacters.push_back(static_cast<char>(typed));
-			terminal->print(Arch::Terminal::Type::Command, static_cast<char>(typed));
-		}
-
-		else if (terminal->is_backspace(typed))
-		{
-			if (!typedCharacters.empty())
-			{
-				typedCharacters.pop_back();
-				terminal->print(Arch::Terminal::Type::Command, "\r");
-				terminal->print(Arch::Terminal::Type::Command, typedCharacters);
-			}
-		}
-
-		else if (terminal->is_return(typed))
-		{
-			terminal->print(Arch::Terminal::Type::Command, "\n");
-			verify_command();
-		}
+		terminal->print(Arch::Terminal::Type::Command, "\n");
+		verify_command();
 	}
+}
 
-	void boot(Arch::Terminal *terminal, Arch::Cpu *cpu)
+void boot(Arch::Terminal *terminal, Arch::Cpu *cpu)
+{
+	OS::terminal = terminal;
+	OS::cpu = cpu;
+	terminal->println(Arch::Terminal::Type::Command, "Type commands here");
+	terminal->println(Arch::Terminal::Type::App, "Apps output here");
+	terminal->println(Arch::Terminal::Type::Kernel, "Kernel output here");
+	idle_process_ptr = create_process("bin/idle.bin");
+	if (idle_process_ptr == nullptr)
+		panic("Idle process not created");
+	else
+		schedule_process(idle_process_ptr);
+}
+
+void interrupt(const Arch::InterruptCode interrupt)
+{
+	if (interrupt == Arch::InterruptCode::Keyboard)
+		write_command();
+
+	if (interrupt == Arch::InterruptCode::Timer)
 	{
-		OS::terminal = terminal;
-		OS::cpu = cpu;
-		terminal->println(Arch::Terminal::Type::Command, "Type commands here");
-		terminal->println(Arch::Terminal::Type::App, "Apps output here");
-		terminal->println(Arch::Terminal::Type::Kernel, "Kernel output here");
-		idle_process_ptr = create_process("bin/idle.bin");
-		if (idle_process_ptr == nullptr)
-			panic("Idle process not created");
-		else
-			schedule_process(idle_process_ptr);
+		round_robin();
 	}
-
-	void interrupt(const Arch::InterruptCode interrupt)
+	else if (interrupt == Arch::InterruptCode::GPF)
 	{
-		if (interrupt == Arch::InterruptCode::Keyboard)
-			write_command();
-
-		if (interrupt == Arch::InterruptCode::Timer)
-		{
-			round_robin();
-		}
-		else if (interrupt == Arch::InterruptCode::GPF)
-		{
-			terminal->println(Arch::Terminal::Type::Kernel, "General Protection Fault\n");
-			Process *process_to_kill = current_process_ptr;
-			if (ready_processes.size() == 1)
-			{
-				unschedule_process();
-				schedule_process(idle_process_ptr);
-				kill(process_to_kill);
-			}
-			else
-			{
-				ready_processes_begin = ready_processes.begin();
-				round_robin();
-				kill(process_to_kill);
-			}
-		}
-	}
-
-	void syscall()
-	{
-
+		terminal->println(Arch::Terminal::Type::Kernel, "General Protection Fault\n");
 		Process *process_to_kill = current_process_ptr;
-		switch (cpu->get_gpr(0))
+		if (ready_processes.size() == 1)
 		{
-		case 0:
-			if (ready_processes.size() == 1)
-			{
-				unschedule_process();
-				schedule_process(idle_process_ptr);
-				kill(process_to_kill);
-				break;
-			}
+			unschedule_process();
+			schedule_process(idle_process_ptr);
+			kill(process_to_kill);
+		}
+		else
+		{
+			ready_processes_begin = ready_processes.begin();
 			round_robin();
 			kill(process_to_kill);
-			break;
-
-		case 1:
-		{
-			uint16_t addr = cpu->get_gpr(1);
-
-			addr = cpu->translate(&current_process_ptr->page_table, addr);
-
-			while (cpu->pmem_read(addr) != 0)
-			{
-
-				terminal->print(Arch::Terminal::Type::App, static_cast<char>(cpu->pmem_read(addr)));
-				addr++;
-			}
-			break;
-		}
-		case 2:
-			terminal->println(Arch::Terminal::Type::App, "\n");
-			break;
-		case 3:
-			terminal->println(Arch::Terminal::Type::App, cpu->get_gpr(1));
-			break;
-
-		case 6:
-			terminal->println(Arch::Terminal::Type::Kernel, "Putting process" + current_process_ptr->name + " to sleep\n");
-			sleep(cpu->get_gpr(1));
-			round_robin();
-			break;
 		}
 	}
+}
+
+void syscall()
+{
+
+	Process *process_to_kill = current_process_ptr;
+	switch (cpu->get_gpr(0))
+	{
+	case 0:
+		if (ready_processes.size() == 1)
+		{
+			unschedule_process();
+			schedule_process(idle_process_ptr);
+			kill(process_to_kill);
+			break;
+		}
+		round_robin();
+		kill(process_to_kill);
+		break;
+
+	case 1:
+	{
+		uint16_t addr = cpu->get_gpr(1);
+
+		addr = cpu->translate(&current_process_ptr->page_table, addr);
+
+		while (cpu->pmem_read(addr) != 0)
+		{
+
+			terminal->print(Arch::Terminal::Type::App, static_cast<char>(cpu->pmem_read(addr)));
+			addr++;
+		}
+		break;
+	}
+	case 2:
+		terminal->println(Arch::Terminal::Type::App, "\n");
+		break;
+	case 3:
+		terminal->println(Arch::Terminal::Type::App, cpu->get_gpr(1));
+		break;
+
+	case 6:
+		terminal->println(Arch::Terminal::Type::Kernel, "Putting process" + current_process_ptr->name + " to sleep\n");
+		sleep(cpu->get_gpr(1));
+		round_robin();
+		break;
+	}
+
+case 7:
+	actual_app_time = cpu->get_gpr(1);
+	terminal->println(Arch::Terminal::Type::Kernel, "Actual Application Time: " + std::to_string(actual_app_time) + "\n");
+	break;
+}
 }
