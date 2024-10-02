@@ -278,6 +278,10 @@ namespace OS
 		terminal->println(Arch::Terminal::Type::Command, "\n");
 	}
 
+	void sleep(const uint32_t s)
+	{
+	}
+
 	void kill(Process *process)
 	{
 		if (process->state == Process::State::Running)
@@ -474,8 +478,6 @@ namespace OS
 
 			addr = cpu->translate(&current_process_ptr->page_table, addr);
 
-			terminal->println(Arch::Terminal::Type::Kernel, "Printing string at address " + std::to_string(addr) + "\n");
-
 			while (cpu->pmem_read(addr) != 0)
 			{
 
@@ -489,6 +491,12 @@ namespace OS
 			break;
 		case 3:
 			terminal->println(Arch::Terminal::Type::App, cpu->get_gpr(1));
+			break;
+
+		case 6:
+			terminal->println(Arch::Terminal::Type::Kernel, "Putting process" + current_process_ptr->name + " to sleep\n");
+			sleep(cpu->get_gpr(1));
+			round_robin();
 			break;
 		}
 	}
