@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
+#include <time.h>
 
 #include "config.h"
 #include "lib.h"
@@ -38,6 +39,7 @@ namespace OS
 		};
 		State state;
 		PageTable page_table;
+		time_t application_start_time;
 	};
 
 	struct Frame
@@ -54,7 +56,7 @@ namespace OS
 	Process *current_process_ptr = nullptr;
 	Process *idle_process_ptr = nullptr;
 
-	float actual_app_time = 0.0f;
+	time_t actual_app_time = 0.0f;
 
 	std::list<Process *> ready_processes;
 	std::list<Process *>::iterator ready_processes_begin = ready_processes.begin();
@@ -90,6 +92,7 @@ namespace OS
 				return i;
 			}
 		}
+		return 0;
 	}
 
 	void desallocate_frame(Process *process)
@@ -122,7 +125,7 @@ namespace OS
 
 		MemoryInterval *interval = &(*iterator);
 
-		MemoryInterval new_memory = {interval->start, (interval->start + size - 1)};
+		MemoryInterval new_memory = {interval->start, uint16_t(interval->start + size - 1)};
 
 		if (interval->end - interval->start + 1 == size)
 			free_memory_intervals.erase(iterator);
@@ -165,6 +168,7 @@ namespace OS
 				process->registers[i] = 0;
 
 			process->state = Process::State::Ready;
+			process->application_start_time = time(NULL);
 
 			init_page_table(process->page_table);
 
@@ -417,6 +421,7 @@ namespace OS
 
 	void boot(Arch::Terminal *terminal, Arch::Cpu *cpu)
 	{
+		actual_app_time = time(NULL);
 		OS::terminal = terminal;
 		OS::cpu = cpu;
 		terminal->println(Arch::Terminal::Type::Command, "Type commands here");
@@ -459,7 +464,6 @@ namespace OS
 
 	void syscall()
 	{
-
 		Process *process_to_kill = current_process_ptr;
 		switch (cpu->get_gpr(0))
 		{
@@ -476,6 +480,7 @@ namespace OS
 			break;
 
 		case 1:
+		{
 			uint16_t addr = cpu->get_gpr(1);
 
 			addr = cpu->translate(&current_process_ptr->page_table, addr);
@@ -487,6 +492,7 @@ namespace OS
 				addr++;
 			}
 			break;
+		}
 		case 2:
 			terminal->println(Arch::Terminal::Type::App, "\n");
 			break;
@@ -500,8 +506,8 @@ namespace OS
 			round_robin();
 			break;
 		case 7:
-			actual_app_time = cpu->get_gpr(1);
-			terminal->println(Arch::Terminal::Type::Kernel, "Actual Application Time: " + std::to_string(actual_app_time) + "\n");
+			time_t app_runtime = time(NULL) - current_process_ptr->application_start_time;
+			terminal->println(Arch::Terminal::Type::Kernel, "Actual Application Time: " + std::to_string(app_runtime) + "\n");
 			break;
 		}
 	}
