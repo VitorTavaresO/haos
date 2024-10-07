@@ -59,6 +59,7 @@ namespace OS
 
 	std::list<Process *> ready_processes;
 	std::list<Process *>::iterator ready_processes_begin = ready_processes.begin();
+	std::list<Process *> blocked_processes;
 
 	std::list<MemoryInterval> free_memory_intervals = {{0, Config::memsize_words - 1}};
 
@@ -254,13 +255,6 @@ namespace OS
 	{
 		if (current_process_ptr != idle_process_ptr && ready_processes.size() > 1)
 		{
-
-			if ((*ready_processes_begin)->state == Process::State::Blocked)
-			{
-				if ((*ready_processes_begin)->application_wakeup_time <= time(NULL))
-					(*ready_processes_begin)->state = Process::State::Ready;
-			}
-
 			if ((*ready_processes_begin)->state == Process::State::Ready)
 			{
 				Process *process = *ready_processes_begin;
@@ -292,10 +286,38 @@ namespace OS
 		terminal->println(Arch::Terminal::Type::Command, "\n");
 	}
 
-	void sleep(Process *process, time_t time_to_sleep)
+	void sleep(Process *process, uint16_t time_to_sleep)
 	{
 		process->state = Process::State::Blocked;
-		process->application_wakeup_time = time(NULL);
+		process->application_wakeup_time = time(NULL) + time_to_sleep;
+
+		ready_processes.remove(process);
+
+		blocked_processes.push_back(process);
+
+		terminal->println(Arch::Terminal::Type::Kernel, "Process " + process->name + " going to sleep for " + std::to_string(time_to_sleep) + "\n");
+	}
+
+	void wakeup()
+	{
+		for (auto it = blocked_processes.begin(); it != blocked_processes.end();)
+		{
+			Process *process = *it;
+			if (process->state == Process::State::Blocked && process->application_wakeup_time <= time(NULL))
+			{
+				process->state = Process::State::Ready;
+
+				it = blocked_processes.erase(it);
+
+				ready_processes.push_back(process);
+
+				terminal->println(Arch::Terminal::Type::Kernel, "Process " + process->name + " woke up\n");
+			}
+			else
+			{
+				++it;
+			}
+		}
 	}
 
 	void kill(Process *process)
@@ -444,13 +466,14 @@ namespace OS
 
 	void interrupt(const Arch::InterruptCode interrupt)
 	{
+		wakeup();
+
 		if (interrupt == Arch::InterruptCode::Keyboard)
 			write_command();
 
-		if (interrupt == Arch::InterruptCode::Timer)
-		{
+		else if (interrupt == Arch::InterruptCode::Timer)
 			round_robin();
-		}
+
 		else if (interrupt == Arch::InterruptCode::GPF)
 		{
 			terminal->println(Arch::Terminal::Type::Kernel, "General Protection Fault\n");
@@ -510,10 +533,19 @@ namespace OS
 
 		case 6:
 		{
-			terminal->println(Arch::Terminal::Type::Kernel, "Putting process " + current_process_ptr->name + " to sleep\n");
 			Process *process_to_sleep = current_process_ptr;
-			round_robin();
-			sleep(process_to_sleep, cpu->get_gpr(1));
+			time_t time_to_sleep = cpu->get_gpr(1);
+			if (ready_processes.size() == 1)
+			{
+				unschedule_process();
+				schedule_process(idle_process_ptr);
+				sleep(process_to_sleep, time_to_sleep);
+			}
+			else
+			{
+				round_robin();
+				sleep(process_to_sleep, time_to_sleep);
+			}
 			break;
 		}
 		case 7:
