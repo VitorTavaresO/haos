@@ -39,7 +39,8 @@ namespace OS
 		};
 		State state;
 		PageTable page_table;
-		time_t application_start_time;
+		time_t start_application_time;
+		time_t application_wakeup_time;
 	};
 
 	struct Frame
@@ -55,8 +56,6 @@ namespace OS
 
 	Process *current_process_ptr = nullptr;
 	Process *idle_process_ptr = nullptr;
-
-	time_t actual_app_time = 0.0f;
 
 	std::list<Process *> ready_processes;
 	std::list<Process *>::iterator ready_processes_begin = ready_processes.begin();
@@ -168,7 +167,7 @@ namespace OS
 				process->registers[i] = 0;
 
 			process->state = Process::State::Ready;
-			process->application_start_time = time(NULL);
+			process->start_application_time = time(NULL);
 
 			init_page_table(process->page_table);
 
@@ -255,16 +254,25 @@ namespace OS
 	{
 		if (current_process_ptr != idle_process_ptr && ready_processes.size() > 1)
 		{
-			Process *process = *ready_processes_begin;
-			ready_processes.push_back(process);
-			ready_processes.pop_front();
-			ready_processes_begin = ready_processes.begin();
 
-			unschedule_process();
-			schedule_process(process);
+			if ((*ready_processes_begin)->state == Process::State::Blocked)
+			{
+				if ((*ready_processes_begin)->application_wakeup_time <= time(NULL))
+					(*ready_processes_begin)->state = Process::State::Ready;
+			}
+
+			if ((*ready_processes_begin)->state == Process::State::Ready)
+			{
+				Process *process = *ready_processes_begin;
+				ready_processes.push_back(process);
+				ready_processes.pop_front();
+				ready_processes_begin = ready_processes.begin();
+
+				unschedule_process();
+				schedule_process(process);
+			}
 		}
 	}
-
 	void list_processes()
 	{
 		terminal->println(Arch::Terminal::Type::Command, "Processes:\n");
@@ -284,9 +292,10 @@ namespace OS
 		terminal->println(Arch::Terminal::Type::Command, "\n");
 	}
 
-	void sleep(Process *process)
+	void sleep(Process *process, time_t time_to_sleep)
 	{
 		process->state = Process::State::Blocked;
+		process->application_wakeup_time = time(NULL);
 	}
 
 	void kill(Process *process)
@@ -421,7 +430,6 @@ namespace OS
 
 	void boot(Arch::Terminal *terminal, Arch::Cpu *cpu)
 	{
-		actual_app_time = time(NULL);
 		OS::terminal = terminal;
 		OS::cpu = cpu;
 		terminal->println(Arch::Terminal::Type::Command, "Type commands here");
@@ -501,13 +509,16 @@ namespace OS
 			break;
 
 		case 6:
-			terminal->println(Arch::Terminal::Type::Kernel, "Putting process" + current_process_ptr->name + " to sleep\n");
-			sleep(current_process_ptr);
+		{
+			terminal->println(Arch::Terminal::Type::Kernel, "Putting process " + current_process_ptr->name + " to sleep\n");
+			Process *process_to_sleep = current_process_ptr;
 			round_robin();
+			sleep(process_to_sleep, cpu->get_gpr(1));
 			break;
+		}
 		case 7:
-			time_t app_runtime = time(NULL) - current_process_ptr->application_start_time;
-			terminal->println(Arch::Terminal::Type::Kernel, "Actual Application Time: " + std::to_string(app_runtime) + "\n");
+			time_t runtime = time(NULL) - current_process_ptr->start_application_time;
+			terminal->println(Arch::Terminal::Type::Kernel, "Actual Application Time: " + std::to_string(runtime) + "\n");
 			break;
 		}
 	}
