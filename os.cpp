@@ -248,6 +248,12 @@ namespace OS
 			if (process->name == fname)
 				return process;
 		}
+		for (auto it = blocked_processes.begin(); it != blocked_processes.end(); it++)
+		{
+			Process *process = *it;
+			if (process->name == fname)
+				return process;
+		}
 		return nullptr;
 	}
 
@@ -381,39 +387,32 @@ namespace OS
 			typedCharacters.erase(0, 5);
 			std::string filename = typedCharacters;
 			typedCharacters.clear();
-			if (current_process_ptr != idle_process_ptr)
+			Process *process = search_process(filename);
+			if (process != nullptr)
 			{
-				Process *process = search_process(filename);
-				if (process != nullptr)
+				if (process == current_process_ptr)
 				{
-					if (process == current_process_ptr)
+					Process *process_to_kill = current_process_ptr;
+					if (ready_processes.size() == 1)
 					{
-						Process *process_to_kill = current_process_ptr;
-						if (ready_processes.size() == 1)
-						{
-							unschedule_process();
-							schedule_process(idle_process_ptr);
-							kill(process_to_kill);
-						}
-						else
-						{
-							round_robin();
-							kill(process_to_kill);
-						}
+						unschedule_process();
+						schedule_process(idle_process_ptr);
+						kill(process_to_kill);
 					}
 					else
 					{
-						kill(process);
+						round_robin();
+						kill(process_to_kill);
 					}
 				}
 				else
 				{
-					terminal->println(Arch::Terminal::Type::Command, "No process with this name to kill\n");
+					kill(process);
 				}
 			}
 			else
 			{
-				terminal->println(Arch::Terminal::Type::Command, "No process to kill");
+				terminal->println(Arch::Terminal::Type::Command, "No process with this name to kill\n");
 			}
 		}
 		else
@@ -512,15 +511,18 @@ namespace OS
 
 		case 1:
 		{
-			uint16_t addr = cpu->get_gpr(1);
+			uint32_t v_addr = cpu->get_gpr(1);
 
-			addr = cpu->translate(&current_process_ptr->page_table, addr);
-
-			while (cpu->pmem_read(addr) != 0)
+			while (true)
 			{
+				uint32_t p_addr = cpu->translate(&current_process_ptr->page_table, v_addr);
+				char ch = static_cast<char>(cpu->pmem_read(p_addr));
 
-				terminal->print(Arch::Terminal::Type::App, static_cast<char>(cpu->pmem_read(addr)));
-				addr++;
+				if (ch == '\0')
+					break;
+
+				terminal->print(Arch::Terminal::Type::App, ch);
+				v_addr++;
 			}
 			break;
 		}
