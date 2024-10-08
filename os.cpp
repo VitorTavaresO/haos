@@ -172,7 +172,7 @@ namespace OS
 
 			init_page_table(process->page_table);
 
-			const uint32_t num_pages = (bin.size() / Config::page_size_words) + ((bin.size() % Config::page_size_words) != 0 ? 1 : 0);
+			const uint32_t num_pages = (bin.size() / Config::page_size_words) + ((bin.size() % Config::page_size_words) != 0);
 			for (uint32_t i = 0; i < num_pages; ++i)
 			{
 				process->page_table.frames[i] = {allocate_frame(process), true};
@@ -348,6 +348,7 @@ namespace OS
 		// ready_processes.erase(std::remove(ready_processes.begin(), ready_processes.end(), process), ready_processes.end());
 		// std::remove(ready_processes.begin(), ready_processes.end(), process);
 		ready_processes.remove(process);
+		blocked_processes.remove(process);
 		delete process;
 
 		ready_processes_begin = ready_processes.begin();
