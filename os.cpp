@@ -317,7 +317,15 @@ namespace OS
 
 				ready_processes.push_back(process);
 
+				ready_processes_begin = ready_processes.begin();
+
 				terminal->println(Arch::Terminal::Type::Kernel, "Process " + process->name + " woke up\n");
+
+				if (current_process_ptr == idle_process_ptr)
+				{
+					unschedule_process();
+					schedule_process(process);
+				}
 			}
 			else
 			{
@@ -552,6 +560,7 @@ namespace OS
 		}
 		case 7:
 			time_t runtime = time(NULL) - current_process_ptr->start_application_time;
+			cpu->set_gpr(1, runtime);
 			terminal->println(Arch::Terminal::Type::Kernel, "Actual Application Time: " + std::to_string(runtime) + "\n");
 			break;
 		}
