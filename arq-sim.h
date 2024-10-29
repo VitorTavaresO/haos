@@ -245,8 +245,8 @@ namespace Arch
 
 		inline uint32_t translate(PageTable *page_table, uint32_t virtual_address)
 		{
-			uint32_t page_number = virtual_address / Config::page_size_words;
-			uint32_t offset = virtual_address % Config::page_size_words;
+			uint32_t page_number = virtual_address >> 4;
+			uint32_t offset = virtual_address & (Config::page_size_words - 1);
 
 			if (page_number >= page_table->frames.size() || !page_table->frames[page_number].valid)
 			{
@@ -254,7 +254,7 @@ namespace Arch
 			}
 
 			uint32_t frame_number = page_table->frames[page_number].frame_number;
-			return frame_number * Config::page_size_words + offset;
+			return (frame_number << 4) + offset;
 		}
 
 		bool interrupt(const InterruptCode interrupt_code);
