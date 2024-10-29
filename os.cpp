@@ -63,7 +63,7 @@ namespace OS
 
 	std::list<MemoryInterval> free_memory_intervals = {{0, Config::memsize_words - 1}};
 
-	std::vector<Frame> free_frames(Config::memsize_words / Config::page_size_words, {nullptr, true});
+	std::vector<Frame> free_frames(Config::memsize_words >> 4, {nullptr, true});
 
 	void panic(const std::string_view msg)
 	{
@@ -73,7 +73,7 @@ namespace OS
 
 	void init_page_table(PageTable &page_table)
 	{
-		const uint32_t num_pages = Config::virtual_space_size / Config::page_size_words;
+		const uint32_t num_pages = Config::virtual_space_size >> 4;
 		page_table.frames.resize(num_pages);
 		for (uint32_t i = 0; i < num_pages; ++i)
 		{
@@ -172,7 +172,7 @@ namespace OS
 
 			init_page_table(process->page_table);
 
-			const uint32_t num_pages = (bin.size() / Config::page_size_words) + ((bin.size() % Config::page_size_words) != 0);
+			const uint32_t num_pages = (bin.size() + Config::page_size_words - 1) >> 4;
 			for (uint32_t i = 0; i < num_pages; ++i)
 			{
 				process->page_table.frames[i] = {allocate_frame(process), true};
