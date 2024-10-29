@@ -275,6 +275,7 @@ namespace Arch
 			catch (const Mylib::Exception &e)
 			{
 				this->force_interrupt(InterruptCode::GPF);
+				return 0;
 			}
 		}
 
