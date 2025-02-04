@@ -1,7 +1,9 @@
 # HAOS - Hypotetical Architecure Operating System
 
- - This is a speculative operating system under development for the Hypothetical Architecture devised by Professor Eduardo Molina Cruz within the framework of the Computer Architecture course.
+ - This is a simulator for a operating system for the Hypothetical Architecture devised by Professor Eduardo Molina Cruz within the framework of the Computer Architecture course.
  - The aforementioned architecture is identical to that employed in the HASS (Hypothetical Architecture Simulator System) simulator.
+ - This project was done with the help of the professor to improve knowledge of how an operating system works.
+ - The original repository is: https://github.com/ehmcruz/so-sim-cpp-exercicio
 
 
 # Dependencies
